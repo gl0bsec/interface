@@ -1,7 +1,7 @@
 // Main application module
 import { DataManager } from './data.js';
 import { SettingsManager } from './settings.js';
-import { VisualizationManager } from './visualization.js';
+import { D3VisualizationManager as VisualizationManager } from './d3-visualization.js';
 import { UIManager } from './ui.js';
 import { AnalysisManager } from './analysis.js';
 
