@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Embedding Explorer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #0f0f0f;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            height: 100vh;
+            gap: 1px;
+            background-color: #1a1a1a;
+        }
+        
+        .main-panel {
+            background-color: #0a0a0a;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #plot {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .side-panel {
+            background-color: #0f0f0f;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid #2a2a2a;
+        }
+        
+        .panel-header {
+            padding: 20px;
+            border-bottom: 2px solid #3a3a3a;
+            background-color: #1a1a1a;
+        }
+        
+        .panel-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            font-size: 15px;
+            color: #aaa;
+            font-weight: 500;
+        }
+        
+        .stats span span {
+            color: #ffffff;
+            font-weight: 600;
+        }
+        
+        .selection-info {
+            padding: 20px;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        
+        .selection-preview {
+            background-color: #1a1a1a;
+            border: 2px solid #3a3a3a;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .selection-preview h4 {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .text-item {
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            background-color: #1a1a1a;
+            border-radius: 6px;
+            font-size: 14px;
+            line-height: 1.6;
+            border: 2px solid #3a3a3a;
+            transition: all 0.2s;
+            color: #ffffff;
+        }
+        
+        .text-item:hover {
+            background-color: #2a2a2a;
+            border-color: #4a4a4a;
+            transform: translateX(2px);
+        }
+        
+        .field-label {
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-right: 8px;
+        }
+        
+        .field-value {
+            color: #ffffff;
+            font-size: 14px;
+        }
+        
+        .field-row {
+            margin-bottom: 4px;
+        }
+        
+        .field-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .action-panel {
+            padding: 20px;
+            border-top: 1px solid #2a2a2a;
+            background-color: #141414;
+        }
+        
+        .prompt-input {
+            width: 100%;
+            padding: 14px;
+            background-color: #1a1a1a;
+            border: 2px solid #3a3a3a;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 14px;
+            margin-bottom: 16px;
+            resize: vertical;
+            min-height: 80px;
+            font-family: inherit;
+            line-height: 1.5;
+        }
+        
+        .prompt-input:focus {
+            outline: none;
+            border-color: #4a9eff;
+            background-color: #222222;
+            box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
+        }
+        
+        .prompt-input::placeholder {
+            color: #666;
+        }
+        
+        .button {
+            width: 100%;
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #4a9eff, #0066cc);
+            color: white;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(74, 158, 255, 0.3);
+        }
+        
+        .button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(74, 158, 255, 0.4);
+            background: linear-gradient(135deg, #5fa8ff, #0077dd);
+        }
+        
+        .button:disabled {
+            background: #3a3a3a;
+            color: #888;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+            border-color: #2a2a2a;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.3s;
+        }
+        
+        @keyframes slideIn {
+            from { 
+                opacity: 0;
+                transform: translate(-50%, -45%);
+            }
+            to { 
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+        }
+        
+        .modal h3 {
+            color: #ffffff;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        
+        .cost-breakdown {
+            background-color: #1a1a1a;
+            border: 2px solid #3a3a3a;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .cost-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 15px;
+            color: #ffffff;
+        }
+        
+        .cost-item:last-child {
+            margin-bottom: 0;
+            padding-top: 12px;
+            border-top: 2px solid #3a3a3a;
+            font-weight: 600;
+            color: #4a9eff;
+            font-size: 16px;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        
+        .modal-buttons button {
+            flex: 1;
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .confirm-btn {
+            background: linear-gradient(135deg, #4a9eff, #0066cc);
+            color: white;
+        }
+        
+        .confirm-btn:hover {
+            background: linear-gradient(135deg, #5fa8ff, #0077dd);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(74, 158, 255, 0.4);
+        }
+        
+        .cancel-btn {
+            background-color: #3a3a3a;
+            color: #ffffff;
+            border: 2px solid #4a4a4a;
+        }
+        
+        .cancel-btn:hover {
+            background-color: #4a4a4a;
+            border-color: #5a5a5a;
+        }
+        
+        
+        .settings-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 44px;
+            height: 44px;
+            background-color: rgba(30, 30, 30, 0.95);
+            border: 2px solid #3a3a3a;
+            border-radius: 10px;
+            color: #ffffff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s;
+            font-size: 22px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .settings-btn:hover {
+            background-color: rgba(50, 50, 50, 0.95);
+            border-color: #4a4a4a;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+        
+        .settings-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            animation: fadeIn 0.3s;
+        }
+        
+        .settings-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.3s;
+        }
+        
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .settings-header h3 {
+            color: #ffffff;
+            font-size: 24px;
+            margin: 0;
+        }
+        
+        .close-settings {
+            background-color: #3a3a3a;
+            border: 2px solid #4a4a4a;
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .close-settings:hover {
+            background-color: #ff4444;
+            border-color: #ff4444;
+            color: #ffffff;
+            transform: rotate(90deg);
+        }
+        
+        .settings-section {
+            margin-bottom: 28px;
+        }
+        
+        .settings-section:last-child {
+            margin-bottom: 0;
+        }
+        
+        .settings-label {
+            display: block;
+            color: #e0e0e0;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .settings-input {
+            width: 100%;
+            padding: 12px;
+            background-color: #1a1a1a;
+            border: 2px solid #3a3a3a;
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 14px;
+            font-family: 'Monaco', 'Consolas', monospace;
+        }
+        
+        .settings-input:focus {
+            outline: none;
+            border-color: #4a9eff;
+            background-color: #222222;
+            box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
+        }
+        
+        .settings-select {
+            width: 100%;
+            padding: 12px;
+            background-color: #1a1a1a;
+            border: 2px solid #3a3a3a;
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .settings-select:focus {
+            outline: none;
+            border-color: #4a9eff;
+            background-color: #222222;
+            box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
+        }
+        
+        .settings-select option {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            padding: 8px;
+        }
+        
+        .settings-help {
+            color: #aaa;
+            font-size: 13px;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+        
+        .api-key-group {
+            position: relative;
+        }
+        
+        .toggle-visibility {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            border-radius: 4px;
+            color: #ffffff;
+            cursor: pointer;
+            padding: 6px 10px;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        
+        .toggle-visibility:hover {
+            background-color: #3a3a3a;
+            border-color: #4a4a4a;
+        }
+        
+        .settings-footer {
+            display: flex;
+            gap: 12px;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #2a2a2a;
+        }
+        
+        .settings-footer button {
+            flex: 1;
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .save-settings {
+            background: linear-gradient(135deg, #4a9eff, #0066cc);
+            color: white;
+        }
+        
+        .save-settings:hover {
+            background: linear-gradient(135deg, #5fa8ff, #0077dd);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(74, 158, 255, 0.4);
+        }
+        
+        .cancel-settings {
+            background-color: #3a3a3a;
+            color: #ffffff;
+            border: 2px solid #4a4a4a;
+        }
+        
+        .cancel-settings:hover {
+            background-color: #4a4a4a;
+            border-color: #5a5a5a;
+        }
+        
+        .warning-box {
+            background-color: rgba(255, 152, 0, 0.15);
+            border: 2px solid rgba(255, 152, 0, 0.5);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            font-size: 14px;
+            color: #ffb74d;
+            box-shadow: 0 2px 8px rgba(255, 152, 0, 0.1);
+        }
+        
+        .warning-box strong {
+            color: #ff9800;
+            font-weight: 700;
+        }
+        
+        .selection-tools {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(30, 30, 30, 0.95);
+            border: 2px solid #3a3a3a;
+            border-radius: 10px;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .legend-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background-color: rgba(30, 30, 30, 0.95);
+            border: 2px solid #3a3a3a;
+            border-radius: 10px;
+            padding: 12px 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            max-width: 200px;
+        }
+        
+        .legend-title {
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+            font-size: 13px;
+            color: #aaa;
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        
+        .tool-btn {
+            padding: 10px 16px;
+            background-color: #2a2a2a;
+            border: 2px solid #3a3a3a;
+            border-radius: 6px;
+            color: #ffffff;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        
+        .tool-btn:hover {
+            background-color: #3a3a3a;
+            border-color: #4a4a4a;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .tool-btn.active {
+            background: linear-gradient(135deg, #4a9eff, #0066cc);
+            border-color: #0066cc;
+            color: white;
+            box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+        }
+        
+        .results-panel {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 350px;
+            background-color: #0f0f0f;
+            border-top: 1px solid #2a2a2a;
+            height: 300px;
+            animation: slideUp 0.3s;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        
+        .results-header {
+            padding: 16px 20px;
+            background-color: #1a1a1a;
+            border-bottom: 2px solid #3a3a3a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .results-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+        
+        .results-content {
+            padding: 20px;
+            height: calc(100% - 60px);
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .close-results {
+            background-color: #3a3a3a;
+            border: 2px solid #4a4a4a;
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 12px;
+            transition: all 0.2s;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background-color: #141414;
+            border: 2px solid #3a3a3a;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #4a9eff;
+        }
+        
+        .checkbox-item label {
+            color: #ffffff;
+            font-size: 14px;
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .checkbox-item:hover label {
+            color: #4a9eff;
+        }
+        
+</head>
+<body>
+    <div class="container">
+        <div class="main-panel">
+            <button class="settings-btn" onclick="showSettings()" title="Settings">⚙</button>
+            <div class="selection-tools">
+                <button class="tool-btn active" onclick="setSelectionMode('lasso')">Lasso</button>
+                <button class="tool-btn" onclick="setSelectionMode('box')">Box</button>
+                <button class="tool-btn" onclick="clearSelection()">Clear</button>
+            </div>
+            <div class="legend-panel" id="legendPanel">
+                <div class="legend-title">Categories</div>
+                <!-- Dynamically populated -->
+            </div>
+            <div id="plot"></div>
+        </div>
+        
+        <div class="side-panel">
+            <div class="panel-header">
+                <h2>Selection Analysis</h2>
+                <div class="stats">
+                    <span>Total: <span id="totalPoints">0</span></span>
+                    <span>Selected: <span id="selectedPoints">0</span></span>
+                </div>
+            </div>
+            
+            <div class="selection-info">
+                <div id="selectionPreview">
+                    <p style="color: #888; text-align: center; padding: 40px; font-size: 15px;">
+                        Select points on the scatter plot to analyze them
+                    </p>
+                </div>
+            </div>
+            
+            <div class="action-panel">
+                <textarea class="prompt-input" id="promptInput" placeholder="Enter your analysis prompt...">Analyze these items and identify common themes, patterns, or groupings. Consider all provided fields in your analysis. What insights can you extract from this selection?</textarea>
+                <button class="button" id="analyzeBtn" onclick="showConfirmation()" disabled>
+                    Analyze Selection
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="confirmModal">
+        <div class="modal-content">
+            <h3>Confirm Analysis Request</h3>
+            <p style="color: #aaa; margin-bottom: 20px; font-size: 16px;">
+                You're about to send <span id="confirmCount" style="color: #4a9eff; font-weight: 700; font-size: 18px;">0</span> data items for analysis.
+            </p>
+            
+            <div class="cost-breakdown">
+                <div class="cost-item">
+                    <span>Data to analyze:</span>
+                    <span id="costTexts">0</span>
+                </div>
+                <div class="cost-item">
+                    <span>Estimated tokens:</span>
+                    <span id="costTokens">0</span>
+                </div>
+                <div class="cost-item">
+                    <span>Model:</span>
+                    <span id="costModel">GPT-3.5-Turbo</span>
+                </div>
+                <div class="cost-item">
+                    <span>Estimated cost:</span>
+                    <span id="costEstimate">$0.00</span>
+                </div>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="cancel-btn" onclick="hideConfirmation()">Cancel</button>
+                <button class="confirm-btn" onclick="proceedWithAnalysis()">Proceed</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="settings-modal" id="settingsModal">
+        <div class="settings-content">
+            <div class="settings-header">
+                <h3>Settings</h3>
+                <button class="close-settings" onclick="hideSettings()">×</button>
+            </div>
+            
+            <div class="settings-section">
+                <label class="settings-label">API Key</label>
+                <div class="api-key-group">
+                    <input type="password" 
+                           class="settings-input" 
+                           id="apiKeyInput" 
+                           placeholder="sk-..."
+                           autocomplete="off">
+                    <button class="toggle-visibility" onclick="toggleApiKeyVisibility()" title="Toggle visibility">
+                        <span id="visibilityIcon">👁</span>
+                    </button>
+                </div>
+                <p class="settings-help">Your OpenAI API key. This is stored locally in your browser.</p>
+            </div>
+            
+            <div class="settings-section">
+                <label class="settings-label">Model</label>
+                <select class="settings-select" id="modelSelect">
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo ($0.002/1K tokens)</option>
+                    <option value="gpt-4">GPT-4 ($0.03/1K tokens)</option>
+                    <option value="gpt-4-turbo-preview">GPT-4 Turbo ($0.01/1K tokens)</option>
+                </select>
+                <p class="settings-help">Select the model to use for analysis. Prices are approximate.</p>
+            </div>
+            
+            <div class="settings-section">
+                <label class="settings-label">API Endpoint</label>
+                <input type="text" 
+                       class="settings-input" 
+                       id="endpointInput" 
+                       value="https://api.openai.com/v1/chat/completions">
+                <p class="settings-help">API endpoint URL. Change this only if using a custom endpoint.</p>
+            </div>
+            
+            <div class="settings-section">
+                <label class="settings-label">Max Tokens</label>
+                <input type="number" 
+                       class="settings-input" 
+                       id="maxTokensInput" 
+                       value="1000" 
+                       min="100" 
+                       max="4000">
+                <p class="settings-help">Maximum tokens for the response. Higher values allow longer responses.</p>
+            </div>
+            
+            <div class="settings-section">
+                <label class="settings-label">Display Fields</label>
+                <div class="checkbox-group" id="displayFieldsGroup">
+                    <!-- Dynamically populated -->
+                </div>
+                <p class="settings-help">Select which fields to show in the selection preview.</p>
+            </div>
+            
+            <div class="settings-section">
+                <label class="settings-label">API Fields</label>
+                <div class="checkbox-group" id="apiFieldsGroup">
+                    <!-- Dynamically populated -->
+                </div>
+                <p class="settings-help">Select which fields to include when sending data to the API.</p>
+            </div>
+            
+            <div class="warning-box">
+                <strong>⚠️ Security Notice:</strong> Your API key is stored in your browser's local storage. Never share your API key or use it on untrusted websites.
+            </div>
+            
+            <div style="background-color: rgba(74, 158, 255, 0.1); border: 2px solid rgba(74, 158, 255, 0.3); border-radius: 8px; padding: 16px; margin-top: 16px;">
+                <strong style="color: #4a9eff;">💡 Tip:</strong> 
+                <span style="color: #aaa;">The "content" field is always included by default. Select additional fields to enrich your analysis with metadata like categories, dates, or custom attributes.</span>
+            </div>
+            
+            <div class="settings-footer">
+                <button class="cancel-settings" onclick="hideSettings()">Cancel</button>
+                <button class="save-settings" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="results-panel" id="resultsPanel">
+        <div class="results-header">
+            <h3 style="margin: 0; font-size: 16px;">Analysis Results</h3>
+            <button class="close-results" onclick="hideResults()">×</button>
+        </div>
+        <div class="results-content" id="resultsContent"></div>
+    </div>
+
+    <script>
+        // Sample data - replace with your actual embeddings
+        // Your data should have x, y coordinates and any additional fields you want to display/analyze
+        const sampleTexts = [
+            { content: "Climate change impacts on coastal regions", category: "Environment", date: "2025-01-15", author: "Smith J.", sentiment: "Negative" },
+            { content: "New AI breakthrough in language processing", category: "Technology", date: "2025-01-14", author: "Chen L.", sentiment: "Positive" },
+            { content: "Global economic uncertainty amid inflation", category: "Economy", date: "2025-01-13", author: "Johnson M.", sentiment: "Negative" },
+            { content: "Renewable energy adoption accelerates", category: "Environment", date: "2025-01-12", author: "Williams A.", sentiment: "Positive" },
+            { content: "Tech giants face regulatory scrutiny", category: "Technology", date: "2025-01-11", author: "Davis R.", sentiment: "Neutral" },
+            { content: "Healthcare innovation in remote medicine", category: "Healthcare", date: "2025-01-10", author: "Brown K.", sentiment: "Positive" },
+            { content: "Urban planning for sustainable cities", category: "Environment", date: "2025-01-09", author: "Garcia M.", sentiment: "Positive" },
+            { content: "Cryptocurrency market volatility continues", category: "Finance", date: "2025-01-08", author: "Miller T.", sentiment: "Negative" },
+            { content: "Education technology transforms learning", category: "Education", date: "2025-01-07", author: "Wilson E.", sentiment: "Positive" },
+            { content: "Space exploration reaches new milestone", category: "Science", date: "2025-01-06", author: "Anderson P.", sentiment: "Positive" },
+            { content: "Biodiversity conservation efforts expand", category: "Environment", date: "2025-01-05", author: "Taylor S.", sentiment: "Neutral" },
+            { content: "Quantum computing advances rapidly", category: "Technology", date: "2025-01-04", author: "Lee H.", sentiment: "Positive" },
+            { content: "Social media influence on democracy", category: "Politics", date: "2025-01-03", author: "Martin D.", sentiment: "Negative" },
+            { content: "Food security challenges worldwide", category: "Agriculture", date: "2025-01-02", author: "White L.", sentiment: "Negative" },
+            { content: "Artificial intelligence ethics debate", category: "Technology", date: "2025-01-01", author: "Harris J.", sentiment: "Neutral" },
+            { content: "Ocean pollution threatens marine life", category: "Environment", date: "2024-12-31", author: "Clark B.", sentiment: "Negative" },
+            { content: "Remote work reshapes office culture", category: "Business", date: "2024-12-30", author: "Lewis R.", sentiment: "Neutral" },
+            { content: "Electric vehicle market growth", category: "Technology", date: "2024-12-29", author: "Walker M.", sentiment: "Positive" },
+            { content: "Cybersecurity threats evolve", category: "Technology", date: "2024-12-28", author: "Hall K.", sentiment: "Negative" },
+            { content: "Mental health awareness increases", category: "Healthcare", date: "2024-12-27", author: "Young A.", sentiment: "Positive" }
+        ];
+        
+        // Generate random 2D embeddings for demo
+        const embeddings = sampleTexts.map((data, i) => ({
+            x: Math.random() * 10 - 5 + (i % 4) * 2,
+            y: Math.random() * 10 - 5 + Math.floor(i / 4) * 1.5,
+            ...data,
+            index: i
+        }));
+        
+        // Extract available fields from data
+        const availableFields = Object.keys(embeddings[0]).filter(key => 
+            !['x', 'y', 'index'].includes(key)
+        );
+        
+        let selectedIndices = new Set();
+        let selectionMode = 'lasso';
+        
+        // Settings configuration
+        let settings = {
+            apiKey: '',
+            model: 'gpt-3.5-turbo',
+            endpoint: 'https://api.openai.com/v1/chat/completions',
+            maxTokens: 1000,
+            displayFields: ['content', 'category', 'date'], // Fields to show in selection
+            apiFields: ['content', 'category'] // Fields to include in API call
+        };
+        
+        // Model pricing (per 1K tokens)
+        const modelPricing = {
+            'gpt-3.5-turbo': 0.002,
+            'gpt-4': 0.03,
+            'gpt-4-turbo-preview': 0.01
+        };
+        
+        // Load settings from localStorage
+        function loadSettings() {
+            const savedSettings = localStorage.getItem('embeddingAnalyzerSettings');
+            if (savedSettings) {
+                try {
+                    const loaded = JSON.parse(savedSettings);
+                    settings = { ...settings, ...loaded };
+                    
+                    // Ensure arrays exist for field selections
+                    if (!Array.isArray(settings.displayFields)) {
+                        settings.displayFields = ['content', 'category', 'date'];
+                    }
+                    if (!Array.isArray(settings.apiFields)) {
+                        settings.apiFields = ['content', 'category'];
+                    }
+                } catch (e) {
+                    console.error('Failed to load settings:', e);
+                }
+            }
+        }
+        
+        // Save settings to localStorage
+        function saveSettingsToStorage() {
+            try {
+                localStorage.setItem('embeddingAnalyzerSettings', JSON.stringify(settings));
+            } catch (e) {
+                console.error('Failed to save settings:', e);
+            }
+        }
+        
+        // Show settings modal
+        function showSettings() {
+            document.getElementById('apiKeyInput').value = settings.apiKey;
+            document.getElementById('modelSelect').value = settings.model;
+            document.getElementById('endpointInput').value = settings.endpoint;
+            document.getElementById('maxTokensInput').value = settings.maxTokens;
+            
+            // Populate field checkboxes
+            populateFieldCheckboxes();
+            
+            document.getElementById('settingsModal').style.display = 'block';
+        }
+        
+        // Populate field checkboxes
+        function populateFieldCheckboxes() {
+            const displayGroup = document.getElementById('displayFieldsGroup');
+            const apiGroup = document.getElementById('apiFieldsGroup');
+            
+            displayGroup.innerHTML = '';
+            apiGroup.innerHTML = '';
+            
+            availableFields.forEach(field => {
+                // Display fields checkbox
+                const displayItem = document.createElement('div');
+                displayItem.className = 'checkbox-item';
+                displayItem.innerHTML = `
+                    <input type="checkbox" id="display_${field}" value="${field}" 
+                           ${settings.displayFields.includes(field) ? 'checked' : ''}>
+                    <label for="display_${field}">${field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                `;
+                displayGroup.appendChild(displayItem);
+                
+                // API fields checkbox
+                const apiItem = document.createElement('div');
+                apiItem.className = 'checkbox-item';
+                apiItem.innerHTML = `
+                    <input type="checkbox" id="api_${field}" value="${field}" 
+                           ${settings.apiFields.includes(field) ? 'checked' : ''}>
+                    <label for="api_${field}">${field.charAt(0).toUpperCase() + field.slice(1)}</label>
+                `;
+                apiGroup.appendChild(apiItem);
+            });
+        }
+        
+        // Hide settings modal
+        function hideSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+        
+        // Save settings
+        function saveSettings() {
+            settings.apiKey = document.getElementById('apiKeyInput').value.trim();
+            settings.model = document.getElementById('modelSelect').value;
+            settings.endpoint = document.getElementById('endpointInput').value.trim();
+            settings.maxTokens = parseInt(document.getElementById('maxTokensInput').value);
+            
+            // Get selected display fields
+            settings.displayFields = [];
+            document.querySelectorAll('#displayFieldsGroup input[type="checkbox"]:checked').forEach(checkbox => {
+                settings.displayFields.push(checkbox.value);
+            });
+            
+            // Get selected API fields
+            settings.apiFields = [];
+            document.querySelectorAll('#apiFieldsGroup input[type="checkbox"]:checked').forEach(checkbox => {
+                settings.apiFields.push(checkbox.value);
+            });
+            
+            // Ensure at least content field is selected
+            if (!settings.displayFields.includes('content')) {
+                settings.displayFields.unshift('content');
+            }
+            if (!settings.apiFields.includes('content')) {
+                settings.apiFields.unshift('content');
+            }
+            
+            saveSettingsToStorage();
+            hideSettings();
+            
+            // Update UI based on new settings
+            updateSelectionInfo();
+            
+            // Show success feedback
+            const btn = document.getElementById('analyzeBtn');
+            const originalText = btn.textContent;
+            if (settings.apiKey) {
+                btn.textContent = 'Settings Saved!';
+                btn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+                setTimeout(() => {
+                    btn.textContent = selectedIndices.size > 0 ? 'Analyze Selection' : originalText;
+                    btn.style.background = '';
+                }, 2000);
+            }
+        }
+        
+        // Toggle API key visibility
+        function toggleApiKeyVisibility() {
+            const input = document.getElementById('apiKeyInput');
+            const icon = document.getElementById('visibilityIcon');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                icon.textContent = '👁';
+            }
+        }
+        
+        // Get unique categories for color mapping
+        const categories = [...new Set(embeddings.map(e => e.category))];
+        const categoryColors = [
+            '#4a9eff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#f7b731',
+            '#5f27cd', '#00d2d3', '#ff9ff3', '#54a0ff', '#48dbfb'
+        ];
+        
+        // Initialize plot
+        const trace = {
+            x: embeddings.map(e => e.x),
+            y: embeddings.map(e => e.y),
+            text: embeddings.map(e => e.content),
+            customdata: embeddings.map(e => ({
+                category: e.category || 'N/A',
+                date: e.date || 'N/A',
+                author: e.author || 'N/A',
+                sentiment: e.sentiment || 'N/A'
+            })),
+            mode: 'markers',
+            type: 'scatter',
+            marker: {
+                size: 10,
+                color: embeddings.map(e => {
+                    const catIndex = categories.indexOf(e.category);
+                    return categoryColors[catIndex % categoryColors.length];
+                }),
+                line: {
+                    color: 'rgba(0, 0, 0, 0.3)',
+                    width: 1
+                }
+            },
+            hovertemplate: '<b>%{text}</b><br>' +
+                          'Category: %{customdata.category}<br>' +
+                          'Date: %{customdata.date}<br>' +
+                          'Author: %{customdata.author}<br>' +
+                          'Sentiment: %{customdata.sentiment}' +
+                          '<extra></extra>'
+        };
+        
+        const layout = {
+            title: '',
+            xaxis: { 
+                title: '', 
+                showgrid: true,
+                gridcolor: '#2a2a2a',
+                zerolinecolor: '#3a3a3a',
+                tickfont: { color: '#aaa' }
+            },
+            yaxis: { 
+                title: '', 
+                showgrid: true,
+                gridcolor: '#2a2a2a',
+                zerolinecolor: '#3a3a3a',
+                tickfont: { color: '#aaa' }
+            },
+            paper_bgcolor: '#0a0a0a',
+            plot_bgcolor: '#0a0a0a',
+            font: { color: '#e0e0e0' },
+            showlegend: false,
+            hovermode: 'closest',
+            dragmode: 'lasso'
+        };
+        
+        const config = {
+            responsive: true,
+            displayModeBar: false
+        };
+        
+        Plotly.newPlot('plot', [trace], layout, config);
+        
+        // Handle selection
+        document.getElementById('plot').on('plotly_selected', function(eventData) {
+            if (!eventData || !eventData.points) return;
+            
+            selectedIndices.clear();
+            eventData.points.forEach(point => {
+                selectedIndices.add(point.pointIndex);
+            });
+            
+            updateVisualization();
+            updateSelectionInfo();
+        });
+        
+        function setSelectionMode(mode) {
+            selectionMode = mode;
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            Plotly.relayout('plot', {
+                dragmode: mode === 'lasso' ? 'lasso' : 'select'
+            });
+        }
+        
+        function clearSelection() {
+            selectedIndices.clear();
+            updateVisualization();
+            updateSelectionInfo();
+        }
+        
+        function updateVisualization() {
+            const colors = embeddings.map((e, i) => {
+                if (selectedIndices.has(i)) {
+                    return '#ff6b6b'; // Red for selected
+                } else {
+                    const catIndex = categories.indexOf(e.category);
+                    return categoryColors[catIndex % categoryColors.length];
+                }
+            });
+            
+            const sizes = embeddings.map((_, i) => 
+                selectedIndices.has(i) ? 14 : 10
+            );
+            
+            Plotly.restyle('plot', {
+                'marker.color': [colors],
+                'marker.size': [sizes]
+            });
+            
+            document.getElementById('totalPoints').textContent = embeddings.length;
+            document.getElementById('selectedPoints').textContent = selectedIndices.size;
+            
+            // Update button state
+            const btn = document.getElementById('analyzeBtn');
+            if (!settings.apiKey) {
+                btn.textContent = 'Configure API Key First';
+                btn.disabled = true;
+            } else if (selectedIndices.size === 0) {
+                btn.textContent = 'Analyze Selection';
+                btn.disabled = true;
+            } else {
+                btn.textContent = 'Analyze Selection';
+                btn.disabled = false;
+            }
+        }
+        
+        function updateSelectionInfo() {
+            const preview = document.getElementById('selectionPreview');
+            const btn = document.getElementById('analyzeBtn');
+            
+            if (selectedIndices.size === 0) {
+                preview.innerHTML = '<p style="color: #888; text-align: center; padding: 40px; font-size: 15px;">Select points on the scatter plot to analyze them</p>';
+                btn.disabled = true;
+                return;
+            }
+            
+            const selectedItems = Array.from(selectedIndices)
+                .map(i => embeddings[i])
+                .slice(0, 10);
+            
+            let itemsHtml = selectedItems.map(item => {
+                let fieldHtml = settings.displayFields.map(field => {
+                    if (item[field] !== undefined) {
+                        return `<div class="field-row">
+                            <span class="field-label">${field}:</span> 
+                            <span class="field-value">${item[field]}</span>
+                        </div>`;
+                    }
+                    return '';
+                }).join('');
+                
+                return `<div class="text-item">${fieldHtml}</div>`;
+            }).join('');
+            
+            preview.innerHTML = `
+                <div class="selection-preview">
+                    <h4 style="margin-bottom: 12px; color: #e0e0e0;">Selected Items (${selectedIndices.size} total)</h4>
+                    ${itemsHtml}
+                    ${selectedIndices.size > 10 ? 
+                        `<p style="color: #888; text-align: center; margin-top: 12px; font-size: 14px;">... and ${selectedIndices.size - 10} more</p>` : 
+                        ''}
+                </div>
+            `;
+            
+            // Update button state
+            if (!settings.apiKey) {
+                btn.textContent = 'Configure API Key First';
+                btn.disabled = true;
+                btn.style.background = '#444';
+                btn.style.borderColor = '#555';
+            } else {
+                btn.textContent = 'Analyze Selection';
+                btn.disabled = false;
+                btn.style.background = '';
+                btn.style.borderColor = '';
+            }
+        }
+        
+        function showConfirmation() {
+            // Check if API key is set
+            if (!settings.apiKey) {
+                alert('Please configure your API key in the settings first.');
+                showSettings();
+                return;
+            }
+            
+            const modal = document.getElementById('confirmModal');
+            modal.style.display = 'block';
+            
+            const count = selectedIndices.size;
+            const avgTokensPerText = 50;
+            const promptTokens = 100;
+            const totalTokens = (count * avgTokensPerText) + promptTokens;
+            const costPer1kTokens = modelPricing[settings.model] || 0.002;
+            const estimatedCost = (totalTokens / 1000) * costPer1kTokens;
+            
+            document.getElementById('confirmCount').textContent = count;
+            document.getElementById('costTexts').textContent = count;
+            document.getElementById('costTokens').textContent = `~${totalTokens}`;
+            document.getElementById('costModel').textContent = settings.model.toUpperCase().replace('-', ' ');
+            document.getElementById('costEstimate').textContent = `${estimatedCost.toFixed(4)}`;
+        }
+        
+        function hideConfirmation() {
+            document.getElementById('confirmModal').style.display = 'none';
+        }
+        
+        async function proceedWithAnalysis() {
+            hideConfirmation();
+            
+            // Show loading state
+            const btn = document.getElementById('analyzeBtn');
+            btn.disabled = true;
+            btn.textContent = 'Analyzing...';
+            
+            // Gather selected items with specified fields
+            const selectedItems = Array.from(selectedIndices).map(i => {
+                const item = embeddings[i];
+                const filteredItem = {};
+                settings.apiFields.forEach(field => {
+                    if (item[field] !== undefined) {
+                        filteredItem[field] = item[field];
+                    }
+                });
+                return filteredItem;
+            });
+            
+            const prompt = document.getElementById('promptInput').value;
+            
+            // Format items for API
+            let itemsText = selectedItems.map((item, idx) => {
+                let itemStr = `Item ${idx + 1}:\n`;
+                Object.entries(item).forEach(([key, value]) => {
+                    itemStr += `  ${key}: ${value}\n`;
+                });
+                return itemStr;
+            }).join('\n');
+            
+            const fullPrompt = `${prompt}\n\nData to analyze:\n${itemsText}`;
+            
+            try {
+                const response = await fetch(settings.endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${settings.apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: settings.model,
+                        messages: [
+                            {
+                                role: 'system',
+                                content: 'You are a helpful data analyst specializing in text analysis and pattern recognition.'
+                            },
+                            {
+                                role: 'user',
+                                content: fullPrompt
+                            }
+                        ],
+                        max_tokens: settings.maxTokens,
+                        temperature: 0.7
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                const results = data.choices[0].message.content;
+                
+                showResults(results);
+                btn.disabled = false;
+                btn.textContent = 'Analyze Selection';
+                
+            } catch (error) {
+                console.error('Analysis error:', error);
+                
+                // Show error in results
+                const errorMessage = `## Error During Analysis\n\n${error.message}\n\nPlease check your API key and settings.`;
+                showResults(errorMessage);
+                
+                btn.disabled = false;
+                btn.textContent = 'Analyze Selection';
+            }
+        }
+        
+        function showResults(content) {
+            document.getElementById('resultsContent').textContent = content;
+            document.getElementById('resultsPanel').style.display = 'block';
+        }
+        
+        function hideResults() {
+            document.getElementById('resultsPanel').style.display = 'none';
+        }
+        
+        // Initialize
+        loadSettings();
+        populateLegend();
+        updateVisualization();
+        
+        // Populate legend
+        function populateLegend() {
+            const legendPanel = document.getElementById('legendPanel');
+            const legendHtml = categories.slice(0, 10).map((cat, idx) => `
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: ${categoryColors[idx % categoryColors.length]}"></div>
+                    <span>${cat}</span>
+                </div>
+            `).join('');
+            
+            legendPanel.innerHTML = `
+                <div class="legend-title">Categories</div>
+                ${legendHtml}
+                ${categories.length > 10 ? '<div class="legend-item" style="color: #666;">... and more</div>' : ''}
+                <div class="legend-item" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #3a3a3a;">
+                    <div class="legend-color" style="background-color: #ff6b6b"></div>
+                    <span>Selected</span>
+                </div>
+            `;
+        }
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                hideConfirmation();
+                hideSettings();
+                hideResults();
+            }
+        });
+    </script>
+</body>
+</html>

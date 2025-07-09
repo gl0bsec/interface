@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Embedding Explorer</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div class="container">
+        <div class="main-panel" id="main-content">
+            <div class="visualization-header">
+                <div class="header-controls">
+                    <div class="control-group">
+                        <button class="tool-btn active" onclick="setSelectionMode('lasso')" title="Lasso Selection (Shift+L)">○</button>
+                        <button class="tool-btn" onclick="setSelectionMode('box')" title="Box Selection (Shift+B)">□</button>
+                        <button class="tool-btn" onclick="clearSelection()" title="Clear Selection (Shift+C)">✕</button>
+                    </div>
+                </div>
+            </div>
+            <div class="plot-container">
+                <div id="plot" role="img" aria-label="Interactive scatter plot of text embeddings"></div>
+            </div>
+        </div>
+        
+        <div class="side-panel">
+            <div class="panel-header">
+                <div class="panel-header-content">
+                    <h2>Analysis</h2>
+                    <div class="stats" role="status" aria-live="polite">
+                        <span>Total: <span id="totalPoints" aria-label="Total points">0</span></span>
+                        <span>Selected: <span id="selectedPoints" aria-label="Selected points">0</span></span>
+                    </div>
+                </div>
+                <div class="panel-header-controls">
+                    <button class="settings-btn" onclick="showSettings()" title="Settings" aria-label="Open settings">⚙</button>
+                </div>
+            </div>
+            
+            <div class="panel-tabs">
+                <button class="tab-btn active" data-tab="selection">Selection</button>
+                <button class="tab-btn" data-tab="categories">Categories</button>
+            </div>
+            
+            <div class="tab-content active" id="selectionTab">
+                <div class="selection-info">
+                    <div id="selectionPreview" role="region" aria-label="Selection preview" aria-live="polite">
+                        <p class="empty-state">
+                            Select points to view details
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="action-panel">
+                    <label for="promptInput" class="prompt-label">Analysis Prompt</label>
+                    <textarea class="prompt-input" id="promptInput" placeholder="Enter your analysis prompt..." aria-describedby="prompt-help">Analyze these items and identify common themes, patterns, or groupings.</textarea>
+                    <button class="button" id="analyzeBtn" onclick="showConfirmation()" disabled aria-describedby="analyze-help">
+                        Analyze Selection
+                    </button>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="categoriesTab">
+                <div class="legend-panel">
+                    <div id="legendPanel" class="legend-items">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="confirmModal" role="dialog" aria-labelledby="confirm-title" aria-modal="true">
+        <div class="modal-content">
+            <h3 id="confirm-title">Confirm Analysis Request</h3>
+            <p style="color: #aaa; margin-bottom: 20px; font-size: 16px;">
+                You're about to send <span id="confirmCount" style="color: #4a9eff; font-weight: 700; font-size: 18px;">0</span> data items for analysis.
+            </p>
+            
+            <div class="cost-breakdown">
+                <div class="cost-item">
+                    <span>Data to analyze:</span>
+                    <span id="costTexts">0</span>
+                </div>
+                <div class="cost-item">
+                    <span>Estimated tokens:</span>
+                    <span id="costTokens">0</span>
+                </div>
+                <div class="cost-item">
+                    <span>Model:</span>
+                    <span id="costModel">GPT-3.5-Turbo</span>
+                </div>
+                <div class="cost-item">
+                    <span>Estimated cost:</span>
+                    <span id="costEstimate">$0.00</span>
+                </div>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="cancel-btn" onclick="hideConfirmation()" aria-label="Cancel analysis">Cancel</button>
+                <button class="confirm-btn" onclick="proceedWithAnalysis()" aria-label="Proceed with analysis">Proceed</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="settings-modal" id="settingsModal" role="dialog" aria-labelledby="settings-title" aria-modal="true">
+        <div class="settings-content">
+            <div class="settings-header">
+                <h3 id="settings-title">Settings</h3>
+                <button class="close-settings" onclick="hideSettings()" aria-label="Close settings">×</button>
+            </div>
+            
+            <div class="settings-section">
+                <label class="settings-label">API Key</label>
+                <div class="api-key-group">
+                    <input type="password" 
+                           class="settings-input" 
+                           id="apiKeyInput" 
+                           placeholder="sk-..."
+                           autocomplete="off">
+                    <button class="toggle-visibility" onclick="toggleApiKeyVisibility()" title="Toggle visibility" aria-label="Toggle API key visibility">
+                        <span id="visibilityIcon" aria-hidden="true">👁</span>
+                    </button>
+                </div>
+                <p class="settings-help">Your OpenAI API key. This is stored locally in your browser.</p>
+            </div>
+            
+            <div class="settings-section">
+                <label class="settings-label">Model</label>
+                <select class="settings-select" id="modelSelect">
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo ($0.002/1K tokens)</option>
+                    <option value="gpt-4">GPT-4 ($0.03/1K tokens)</option>
+                    <option value="gpt-4-turbo-preview">GPT-4 Turbo ($0.01/1K tokens)</option>
+                </select>
+                <p class="settings-help">Select the model to use for analysis. Prices are approximate.</p>
+            </div>
+            
+            <div class="settings-section">
+                <label class="settings-label">API Endpoint</label>
+                <input type="text" 
+                       class="settings-input" 
+                       id="endpointInput" 
+                       value="https://api.openai.com/v1/chat/completions">
+                <p class="settings-help">API endpoint URL. Change this only if using a custom endpoint.</p>
+            </div>
+            
+            <div class="settings-section">
+                <label class="settings-label">Max Tokens</label>
+                <input type="number" 
+                       class="settings-input" 
+                       id="maxTokensInput" 
+                       value="1000" 
+                       min="100" 
+                       max="4000">
+                <p class="settings-help">Maximum tokens for the response. Higher values allow longer responses.</p>
+            </div>
+            
+            <div class="settings-section">
+                <label class="settings-label">Display Fields</label>
+                <div class="checkbox-group" id="displayFieldsGroup">
+                    <!-- Dynamically populated -->
+                </div>
+                <p class="settings-help">Select which fields to show in the selection preview.</p>
+            </div>
+            
+            <div class="settings-section">
+                <label class="settings-label">API Fields</label>
+                <div class="checkbox-group" id="apiFieldsGroup">
+                    <!-- Dynamically populated -->
+                </div>
+                <p class="settings-help">Select which fields to include when sending data to the API.</p>
+            </div>
+            
+            <div class="warning-box">
+                <strong>⚠️ Security Notice:</strong> Your API key is stored in your browser's local storage. Never share your API key or use it on untrusted websites.
+            </div>
+            
+            <div style="background-color: rgba(74, 158, 255, 0.1); border: 2px solid rgba(74, 158, 255, 0.3); border-radius: 8px; padding: 16px; margin-top: 16px;">
+                <strong style="color: #4a9eff;">💡 Tip:</strong> 
+                <span style="color: #aaa;">The "content" field is always included by default. Select additional fields to enrich your analysis with metadata like categories, dates, or custom attributes.</span>
+            </div>
+            
+            <div class="settings-footer">
+                <button class="cancel-settings" onclick="hideSettings()" aria-label="Cancel settings changes">Cancel</button>
+                <button class="save-settings" onclick="saveSettings()" aria-label="Save settings changes">Save Settings</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="results-panel" id="resultsPanel" role="region" aria-labelledby="results-title">
+        <div class="results-header">
+            <h3 id="results-title" style="margin: 0; font-size: 16px;">Analysis Results</h3>
+            <button class="close-results" onclick="hideResults()" aria-label="Close results panel">×</button>
+        </div>
+        <div class="results-content" id="resultsContent" role="log" aria-live="polite"></div>
+    </div>
+
+    <script type="module" src="js/app.js?v=2.0"></script>
+</body>
+</html>

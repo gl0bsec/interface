@@ -1,0 +1,38 @@
+{
+  "name": "text-embedding-explorer",
+  "version": "1.0.0",
+  "description": "Interactive web application for visualizing and analyzing text embeddings",
+  "main": "index.html",
+  "scripts": {
+    "start": "npm run serve",
+    "serve": "http-server . -p 3000 -o --cors",
+    "dev": "npm run serve",
+    "serve-python": "python3 -m http.server 3000",
+    "serve-node": "node server.js"
+  },
+  "keywords": [
+    "text-embeddings",
+    "visualization",
+    "ai-analysis",
+    "plotly",
+    "openai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "."
+  },
+  "homepage": ".",
+  "browserslist": [
+    "defaults",
+    "not ie 11",
+    "not op_mini all"
+  ]
+}
