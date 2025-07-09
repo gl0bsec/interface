@@ -462,6 +462,10 @@ function updateSelectionInfo() {
         btn.style.background = '';
         btn.style.borderColor = '';
     }
+    } catch (error) {
+        console.error('Error updating selection info:', error);
+        preview.innerHTML = `<p style="color: #ff6b6b; text-align: center; padding: 20px;">Error: ${error.message}</p>`;
+    }
 }
 
 function showConfirmation() {
@@ -518,41 +522,41 @@ async function proceedWithAnalysis() {
     btn.disabled = true;
     btn.textContent = 'Analyzing...';
     
-    try {
-        // Gather selected items with specified fields
-        const selectedItems = Array.from(selectedIndices)
-            .map(i => {
-                if (i < 0 || i >= embeddings.length) {
-                    console.warn(`Invalid index ${i} in selection`);
-                    return null;
+    // Gather selected items with specified fields
+    const selectedItems = Array.from(selectedIndices)
+        .map(i => {
+            if (i < 0 || i >= embeddings.length) {
+                console.warn(`Invalid index ${i} in selection`);
+                return null;
+            }
+            return embeddings[i];
+        })
+        .filter(item => item !== null)
+        .map(item => {
+            const filteredItem = {};
+            settings.apiFields.forEach(field => {
+                if (item[field] !== undefined) {
+                    filteredItem[field] = item[field];
                 }
-                return embeddings[i];
-            })
-            .filter(item => item !== null)
-            .map(item => {
-                const filteredItem = {};
-                settings.apiFields.forEach(field => {
-                    if (item[field] !== undefined) {
-                        filteredItem[field] = item[field];
-                    }
-                });
-                return filteredItem;
             });
+            return filteredItem;
+        });
         
-        if (selectedItems.length === 0) {
-            throw new Error('No valid items found in selection.');
-        }
-        
-        // Format items for API
-        let itemsText = selectedItems.map((item, idx) => {
-            let itemStr = `Item ${idx + 1}:\n`;
-            Object.entries(item).forEach(([key, value]) => {
-                itemStr += `  ${key}: ${value}\n`;
-            });
-            return itemStr;
-        }).join('\n');
-        
-        const fullPrompt = `${prompt}\n\nData to analyze:\n${itemsText}`;
+
+    if (selectedItems.length === 0) {
+        throw new Error('No valid items found in selection.');
+    }
+
+    // Format items for API
+    let itemsText = selectedItems.map((item, idx) => {
+        let itemStr = `Item ${idx + 1}:\n`;
+        Object.entries(item).forEach(([key, value]) => {
+            itemStr += `  ${key}: ${value}\n`;
+        });
+        return itemStr;
+    }).join('\n');
+
+    const fullPrompt = `${prompt}\n\nData to analyze:\n${itemsText}`;
     
     try {
         // Make API request with timeout
@@ -640,7 +644,6 @@ async function proceedWithAnalysis() {
         btn.disabled = false;
         btn.textContent = 'Analyze Selection';
     }
-}
 }
 
 function showResults(content) {
