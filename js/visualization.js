@@ -4,8 +4,6 @@ export class VisualizationManager {
         this.dataManager = dataManager;
         this.selectedIndices = new Set();
         this.selectionMode = 'lasso';
-        this.defaultXRange = null;
-        this.defaultYRange = null;
         this.categoryColors = [
             '#4a9eff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#f7b731',
             '#5f27cd', '#00d2d3', '#ff9ff3', '#54a0ff', '#48dbfb'
@@ -18,15 +16,6 @@ export class VisualizationManager {
     initializePlot() {
         const embeddings = this.dataManager.getEmbeddings();
         const categories = this.dataManager.getCategories();
-
-        const xValues = embeddings.map(e => e.x);
-        const yValues = embeddings.map(e => e.y);
-        const xMin = Math.min(...xValues);
-        const xMax = Math.max(...xValues);
-        const yMin = Math.min(...yValues);
-        const yMax = Math.max(...yValues);
-        this.defaultXRange = [xMin, xMax];
-        this.defaultYRange = [yMin, yMax];
         
         const trace = {
             x: embeddings.map(e => e.x),
@@ -61,21 +50,19 @@ export class VisualizationManager {
         
         const layout = {
             title: '',
-            xaxis: {
-                title: '',
+            xaxis: { 
+                title: '', 
                 showgrid: true,
                 gridcolor: '#2a2a2a',
                 zerolinecolor: '#3a3a3a',
-                tickfont: { color: '#aaa' },
-                range: this.defaultXRange
+                tickfont: { color: '#aaa' }
             },
-            yaxis: {
-                title: '',
+            yaxis: { 
+                title: '', 
                 showgrid: true,
                 gridcolor: '#2a2a2a',
                 zerolinecolor: '#3a3a3a',
-                tickfont: { color: '#aaa' },
-                range: this.defaultYRange
+                tickfont: { color: '#aaa' }
             },
             paper_bgcolor: '#0a0a0a',
             plot_bgcolor: '#0a0a0a',
@@ -88,8 +75,7 @@ export class VisualizationManager {
         const config = {
             responsive: true,
             displayModeBar: false,
-            staticPlot: false,
-            scrollZoom: true
+            staticPlot: false
         };
         
         Plotly.newPlot('plot', [trace], layout, config).then(() => {
@@ -112,10 +98,6 @@ export class VisualizationManager {
             
             this.updateVisualization();
             this.onSelectionChange?.(this.selectedIndices);
-        });
-
-        document.getElementById('plot').on('plotly_deselect', () => {
-            this.clearSelection();
         });
     }
     
@@ -196,39 +178,7 @@ export class VisualizationManager {
     getSelectedIndices() {
         return new Set(this.selectedIndices);
     }
-
-    zoom(factor) {
-        const plot = document.getElementById('plot');
-        const xaxis = plot.layout.xaxis;
-        const yaxis = plot.layout.yaxis;
-        const xCenter = (xaxis.range[0] + xaxis.range[1]) / 2;
-        const yCenter = (yaxis.range[0] + yaxis.range[1]) / 2;
-        const xHalf = (xaxis.range[1] - xaxis.range[0]) * factor / 2;
-        const yHalf = (yaxis.range[1] - yaxis.range[0]) * factor / 2;
-        Plotly.relayout('plot', {
-            'xaxis.range': [xCenter - xHalf, xCenter + xHalf],
-            'yaxis.range': [yCenter - yHalf, yCenter + yHalf]
-        });
-    }
-
-    zoomIn() {
-        this.zoom(0.8);
-    }
-
-    zoomOut() {
-        this.zoom(1.25);
-    }
-
-    resetZoom() {
-        Plotly.relayout('plot', {
-            'xaxis.range': this.defaultXRange,
-            'yaxis.range': this.defaultYRange
-        });
-    }
-
-    handleResize() {
-        Plotly.Plots.resize('plot');
-    }
-
+    
     // Callback for when selection changes
-    onSelectionChange = null;}
+    onSelectionChange = null;
+}

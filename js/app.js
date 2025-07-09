@@ -44,9 +44,6 @@ class EmbeddingExplorerApp {
         
         window.setSelectionMode = (mode) => this.visualizationManager.setSelectionMode(mode);
         window.clearSelection = () => this.visualizationManager.clearSelection();
-        window.zoomIn = () => this.visualizationManager.zoomIn();
-        window.zoomOut = () => this.visualizationManager.zoomOut();
-        window.resetZoom = () => this.visualizationManager.resetZoom();
         
     }
     
@@ -100,22 +97,6 @@ class EmbeddingExplorerApp {
                         break;
                 }
             }
-
-            switch(event.key) {
-                case '+':
-                case '=':
-                    event.preventDefault();
-                    this.visualizationManager.zoomIn();
-                    break;
-                case '-':
-                    event.preventDefault();
-                    this.visualizationManager.zoomOut();
-                    break;
-                case 'Home':
-                    event.preventDefault();
-                    this.visualizationManager.resetZoom();
-                    break;
-            }
         });
     }
     
@@ -123,4 +104,5 @@ class EmbeddingExplorerApp {
 
 // Initialize the application when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new EmbeddingExplorerApp();});
+    new EmbeddingExplorerApp();
+});
