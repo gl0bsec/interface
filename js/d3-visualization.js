@@ -1,9 +1,10 @@
 export class D3VisualizationManager {
     constructor(dataManager) {
-        console.log('D3VisualizationManager initialized with axes and clipping - v2.0');
+        console.log('D3VisualizationManager initialized with axis masks - v2.1');
         this.dataManager = dataManager;
         this.selectedIndices = new Set();
-        this.selectionMode = 'polygon';
+        // default to lasso selection to match UI
+        this.selectionMode = 'lasso';
         this.zoom = d3.zoom();
         this.brush = null;
         this.polygonPoints = [];
@@ -15,9 +16,10 @@ export class D3VisualizationManager {
             '#5f27cd', '#00d2d3', '#ff9ff3', '#54a0ff', '#48dbfb'
         ];
         
+        this.margins = { top: 40, right: 40, bottom: 60, left: 60 };
+
         this.initializeVisualization();
         this.setupEventHandlers();
-        this.setupKeyboardShortcuts();
     }
     
     initializeVisualization() {
@@ -49,8 +51,9 @@ export class D3VisualizationManager {
             .range(this.categoryColors);
         
         this.createBackground();
-        this.createAxes();
         this.createPoints();
+        this.createAxisMasks();
+        this.createAxes();
         this.setupZoom();
         this.createTooltip();
         
@@ -119,24 +122,10 @@ export class D3VisualizationManager {
     
     createPoints() {
         const embeddings = this.dataManager.getEmbeddings();
-        console.log('Creating points with clipping path');
-        
-        // Create clipping path to ensure points don't show outside plot area
-        this.svg.append('defs')
-            .append('clipPath')
-            .attr('id', 'plot-clip')
-            .append('rect')
-            .attr('x', 60)
-            .attr('y', 40)
-            .attr('width', this.width - 100)
-            .attr('height', this.height - 100);
-        
-        console.log(`Clipping rect: x=60, y=40, width=${this.width - 100}, height=${this.height - 100}`);
-        
-        // Create points group with clipping
+        console.log('Creating points without clipping');
+
         this.pointsGroup = this.svg.append('g')
-            .attr('class', 'points-group')
-            .attr('clip-path', 'url(#plot-clip)');
+            .attr('class', 'points-group');
             
         this.points = this.pointsGroup.selectAll('.point')
             .data(embeddings)
@@ -154,6 +143,49 @@ export class D3VisualizationManager {
             .on('mouseover', (event, d) => this.showTooltip(event, d))
             .on('mouseout', () => this.hideTooltip())
             .on('click', (event, d) => this.togglePoint(d.index, event));
+    }
+
+    createAxisMasks() {
+        this.axisMaskGroup = this.svg.append('g')
+            .attr('class', 'axis-masks');
+
+        const m = this.margins;
+
+        // Left mask
+        this.axisMaskGroup.append('rect')
+            .attr('class', 'mask-left')
+            .attr('x', 0)
+            .attr('y', 0)
+            .attr('width', m.left)
+            .attr('height', this.height)
+            .attr('fill', '#0a0a0a');
+
+        // Right mask
+        this.axisMaskGroup.append('rect')
+            .attr('class', 'mask-right')
+            .attr('x', this.width - m.right)
+            .attr('y', 0)
+            .attr('width', m.right)
+            .attr('height', this.height)
+            .attr('fill', '#0a0a0a');
+
+        // Top mask
+        this.axisMaskGroup.append('rect')
+            .attr('class', 'mask-top')
+            .attr('x', 0)
+            .attr('y', 0)
+            .attr('width', this.width)
+            .attr('height', m.top)
+            .attr('fill', '#0a0a0a');
+
+        // Bottom mask
+        this.axisMaskGroup.append('rect')
+            .attr('class', 'mask-bottom')
+            .attr('x', 0)
+            .attr('y', this.height - m.bottom)
+            .attr('width', this.width)
+            .attr('height', m.bottom)
+            .attr('fill', '#0a0a0a');
     }
     
     createTooltip() {
@@ -179,30 +211,44 @@ export class D3VisualizationManager {
     }
     
     setupEventHandlers() {
-        document.getElementById('selectBtn').addEventListener('click', () => this.setSelectionMode('select'));
-        document.getElementById('polygonBtn').addEventListener('click', () => this.setSelectionMode('polygon'));
-        document.getElementById('clearBtn').addEventListener('click', () => this.clearSelection());
-        document.getElementById('zoomInBtn').addEventListener('click', () => this.zoomIn());
-        document.getElementById('zoomOutBtn').addEventListener('click', () => this.zoomOut());
-        document.getElementById('resetBtn').addEventListener('click', () => this.resetView());
-        
+        // These elements existed in the early prototype. Guard against null to
+        // avoid errors if the IDs are missing in the current UI.
+        const selectBtn = document.getElementById('selectBtn');
+        const polygonBtn = document.getElementById('polygonBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const resetBtn = document.getElementById('resetBtn');
+
+        selectBtn?.addEventListener('click', () => this.setSelectionMode('box'));
+        polygonBtn?.addEventListener('click', () => this.setSelectionMode('lasso'));
+        clearBtn?.addEventListener('click', () => this.clearSelection());
+        zoomInBtn?.addEventListener('click', () => this.zoomIn());
+        zoomOutBtn?.addEventListener('click', () => this.zoomOut());
+        resetBtn?.addEventListener('click', () => this.resetZoom());
+
         window.addEventListener('resize', () => this.handleResize());
     }
     
     setupKeyboardShortcuts() {
         document.addEventListener('keydown', (event) => {
             if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
-            
-            switch(event.key.toLowerCase()) {
-                case 'p':
-                    this.setSelectionMode('polygon');
-                    break;
-                case 'b':
-                    this.setSelectionMode('select');
-                    break;
-                case 'c':
-                    this.clearSelection();
-                    break;
+
+            if (event.shiftKey) {
+                switch(event.key.toLowerCase()) {
+                    case 'l':
+                        this.setSelectionMode('lasso');
+                        break;
+                    case 'b':
+                        this.setSelectionMode('box');
+                        break;
+                    case 'c':
+                        this.clearSelection();
+                        break;
+                }
+            }
+
+            switch(event.key) {
                 case '+':
                 case '=':
                     this.zoomIn();
@@ -210,28 +256,37 @@ export class D3VisualizationManager {
                 case '-':
                     this.zoomOut();
                     break;
-                case 'r':
-                    this.resetView();
+                case 'Home':
+                    this.resetZoom();
                     break;
             }
         });
     }
     
     setSelectionMode(mode) {
+        // Allow legacy values from the prototype
+        if (mode === 'polygon') mode = 'lasso';
+        if (mode === 'select') mode = 'box';
+
         this.selectionMode = mode;
-        
-        document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-        const buttonId = mode === 'polygon' ? 'polygonBtn' : 'selectBtn';
-        document.getElementById(buttonId).classList.add('active');
-        
+
+        // Update active state of toolbar buttons using data-mode attributes
+        document.querySelectorAll('.control-group .tool-btn').forEach(btn => {
+            if (btn.dataset.mode === mode) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
         this.clearSelectionTools();
         this.setupSelectionTool();
     }
     
     setupSelectionTool() {
-        if (this.selectionMode === 'select') {
+        if (this.selectionMode === 'box') {
             this.setupBrushSelection();
-        } else if (this.selectionMode === 'polygon') {
+        } else if (this.selectionMode === 'lasso') {
             this.setupPolygonSelection();
         }
     }
@@ -378,7 +433,7 @@ export class D3VisualizationManager {
         const instructions = container.append('div')
             .attr('class', 'polygon-instructions')
             .html(`
-                <div><strong>Polygon Selection Mode</strong></div>
+                <div><strong>Lasso Selection Mode</strong></div>
                 <div>Click to add vertices • Click first vertex or double-click to complete</div>
             `);
         
@@ -526,7 +581,7 @@ export class D3VisualizationManager {
         this.svg.transition().call(this.zoom.scaleBy, 1 / 1.5);
     }
     
-    resetView() {
+    resetZoom() {
         this.svg.transition().call(this.zoom.transform, d3.zoomIdentity);
     }
     
@@ -556,11 +611,6 @@ export class D3VisualizationManager {
             
         this.yAxisGroup.call(this.yAxis);
         
-        // Update clipping path
-        this.svg.select('#plot-clip rect')
-            .attr('width', this.width - 100)
-            .attr('height', this.height - 100);
-        
         // Update points
         this.points
             .attr('cx', d => this.xScale(d.x))
@@ -570,6 +620,32 @@ export class D3VisualizationManager {
         this.svg.select('.plot-background')
             .attr('width', this.width)
             .attr('height', this.height);
+
+        this.updateAxisMasks();
+    }
+
+    updateAxisMasks() {
+        if (!this.axisMaskGroup) return;
+
+        const m = this.margins;
+
+        this.axisMaskGroup.select('.mask-left')
+            .attr('width', m.left)
+            .attr('height', this.height);
+
+        this.axisMaskGroup.select('.mask-right')
+            .attr('x', this.width - m.right)
+            .attr('width', m.right)
+            .attr('height', this.height);
+
+        this.axisMaskGroup.select('.mask-top')
+            .attr('width', this.width)
+            .attr('height', m.top);
+
+        this.axisMaskGroup.select('.mask-bottom')
+            .attr('y', this.height - m.bottom)
+            .attr('width', this.width)
+            .attr('height', m.bottom);
     }
     
     populateLegend() {
@@ -591,5 +667,4 @@ export class D3VisualizationManager {
         return new Set(this.selectedIndices);
     }
     
-    onSelectionChange = null;
-}
+    onSelectionChange = null;}
