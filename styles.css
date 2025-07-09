@@ -1061,7 +1061,7 @@ textarea:focus-visible {
     cursor: crosshair;
 }
 
-/* Polygon Selection Styles */
+/* Lasso Selection Styles */
 .polygon-selection {
     pointer-events: none;
 }
@@ -1083,12 +1083,12 @@ textarea:focus-visible {
     transform: scale(1.1);
 }
 
-/* Visual feedback for polygon selection mode */
-.main-panel[data-selection-mode="polygon"] #visualization {
+/* Visual feedback for lasso selection mode */
+.main-panel[data-selection-mode="lasso"] #visualization {
     cursor: crosshair;
 }
 
-.main-panel[data-selection-mode="polygon"] .plot-background {
+.main-panel[data-selection-mode="lasso"] .plot-background {
     cursor: crosshair;
 }
 
@@ -1117,7 +1117,7 @@ textarea:focus-visible {
 }
 
 /* Enhanced visual feedback for selection modes */
-.tool-btn[data-mode="polygon"].active::after {
+.tool-btn[data-mode="lasso"].active::after {
     content: '';
     position: absolute;
     bottom: -2px;
@@ -1132,5 +1132,4 @@ textarea:focus-visible {
 
 @keyframes pulse {
     0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
-    50% { opacity: 0.5; transform: translateX(-50%) scale(1.2); }
-}
+    50% { opacity: 0.5; transform: translateX(-50%) scale(1.2); }}
