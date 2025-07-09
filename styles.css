@@ -1061,6 +1061,11 @@ textarea:focus-visible {
     cursor: crosshair;
 }
 
+.axis-masks rect {
+    fill: #0a0a0a;
+    pointer-events: none;
+}
+
 /* Lasso Selection Styles */
 .polygon-selection {
     pointer-events: none;

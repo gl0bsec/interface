@@ -1,6 +1,6 @@
 export class D3VisualizationManager {
     constructor(dataManager) {
-        console.log('D3VisualizationManager initialized with axes and clipping - v2.0');
+        console.log('D3VisualizationManager initialized with axis masks - v2.1');
         this.dataManager = dataManager;
         this.selectedIndices = new Set();
         // default to lasso selection to match UI
@@ -16,6 +16,8 @@ export class D3VisualizationManager {
             '#5f27cd', '#00d2d3', '#ff9ff3', '#54a0ff', '#48dbfb'
         ];
         
+        this.margins = { top: 40, right: 40, bottom: 60, left: 60 };
+
         this.initializeVisualization();
         this.setupEventHandlers();
     }
@@ -49,8 +51,9 @@ export class D3VisualizationManager {
             .range(this.categoryColors);
         
         this.createBackground();
-        this.createAxes();
         this.createPoints();
+        this.createAxisMasks();
+        this.createAxes();
         this.setupZoom();
         this.createTooltip();
         
@@ -119,24 +122,10 @@ export class D3VisualizationManager {
     
     createPoints() {
         const embeddings = this.dataManager.getEmbeddings();
-        console.log('Creating points with clipping path');
-        
-        // Create clipping path to ensure points don't show outside plot area
-        this.svg.append('defs')
-            .append('clipPath')
-            .attr('id', 'plot-clip')
-            .append('rect')
-            .attr('x', 60)
-            .attr('y', 40)
-            .attr('width', this.width - 100)
-            .attr('height', this.height - 100);
-        
-        console.log(`Clipping rect: x=60, y=40, width=${this.width - 100}, height=${this.height - 100}`);
-        
-        // Create points group with clipping
+        console.log('Creating points without clipping');
+
         this.pointsGroup = this.svg.append('g')
-            .attr('class', 'points-group')
-            .attr('clip-path', 'url(#plot-clip)');
+            .attr('class', 'points-group');
             
         this.points = this.pointsGroup.selectAll('.point')
             .data(embeddings)
@@ -154,6 +143,49 @@ export class D3VisualizationManager {
             .on('mouseover', (event, d) => this.showTooltip(event, d))
             .on('mouseout', () => this.hideTooltip())
             .on('click', (event, d) => this.togglePoint(d.index, event));
+    }
+
+    createAxisMasks() {
+        this.axisMaskGroup = this.svg.append('g')
+            .attr('class', 'axis-masks');
+
+        const m = this.margins;
+
+        // Left mask
+        this.axisMaskGroup.append('rect')
+            .attr('class', 'mask-left')
+            .attr('x', 0)
+            .attr('y', 0)
+            .attr('width', m.left)
+            .attr('height', this.height)
+            .attr('fill', '#0a0a0a');
+
+        // Right mask
+        this.axisMaskGroup.append('rect')
+            .attr('class', 'mask-right')
+            .attr('x', this.width - m.right)
+            .attr('y', 0)
+            .attr('width', m.right)
+            .attr('height', this.height)
+            .attr('fill', '#0a0a0a');
+
+        // Top mask
+        this.axisMaskGroup.append('rect')
+            .attr('class', 'mask-top')
+            .attr('x', 0)
+            .attr('y', 0)
+            .attr('width', this.width)
+            .attr('height', m.top)
+            .attr('fill', '#0a0a0a');
+
+        // Bottom mask
+        this.axisMaskGroup.append('rect')
+            .attr('class', 'mask-bottom')
+            .attr('x', 0)
+            .attr('y', this.height - m.bottom)
+            .attr('width', this.width)
+            .attr('height', m.bottom)
+            .attr('fill', '#0a0a0a');
     }
     
     createTooltip() {
@@ -579,11 +611,6 @@ export class D3VisualizationManager {
             
         this.yAxisGroup.call(this.yAxis);
         
-        // Update clipping path
-        this.svg.select('#plot-clip rect')
-            .attr('width', this.width - 100)
-            .attr('height', this.height - 100);
-        
         // Update points
         this.points
             .attr('cx', d => this.xScale(d.x))
@@ -593,6 +620,32 @@ export class D3VisualizationManager {
         this.svg.select('.plot-background')
             .attr('width', this.width)
             .attr('height', this.height);
+
+        this.updateAxisMasks();
+    }
+
+    updateAxisMasks() {
+        if (!this.axisMaskGroup) return;
+
+        const m = this.margins;
+
+        this.axisMaskGroup.select('.mask-left')
+            .attr('width', m.left)
+            .attr('height', this.height);
+
+        this.axisMaskGroup.select('.mask-right')
+            .attr('x', this.width - m.right)
+            .attr('width', m.right)
+            .attr('height', this.height);
+
+        this.axisMaskGroup.select('.mask-top')
+            .attr('width', this.width)
+            .attr('height', m.top);
+
+        this.axisMaskGroup.select('.mask-bottom')
+            .attr('y', this.height - m.bottom)
+            .attr('width', this.width)
+            .attr('height', m.bottom);
     }
     
     populateLegend() {
@@ -614,5 +667,4 @@ export class D3VisualizationManager {
         return new Set(this.selectedIndices);
     }
     
-    onSelectionChange = null;
-}
+    onSelectionChange = null;}
