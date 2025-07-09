@@ -8,7 +8,7 @@ Text Embedding Explorer transforms text data into visual insights by plotting hi
 
 ### Key Features
 
-- **Interactive Visualization**: Plotly-powered scatter plot with smooth zoom, pan, and selection
+- **Interactive Visualization**: Plotly-powered scatter plot with smooth zoom, pan, and selection. Dedicated buttons and scroll wheel controls let you zoom in, zoom out, and return home.
 - **AI-Powered Analysis**: Integration with OpenAI API for intelligent text analysis
 - **Flexible Selection**: Lasso and box selection tools with keyboard shortcuts
 - **Real-time Preview**: Instant preview of selected data points with metadata
