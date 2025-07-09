@@ -50,8 +50,8 @@ This is a **Text Embedding Explorer** - a modular web application for visualizin
    - Handles localStorage persistence
    - Provides input validation for API settings
 
-3. **VisualizationManager** (`js/visualization.js`)
-   - Controls Plotly.js scatter plot visualization
+3. **VisualizationManager** (`js/d3-visualization.js`)
+   - Controls D3.js scatter plot visualization
    - Manages selection interactions (lasso/box selection)
    - Handles visual updates and category-based color coding
 
@@ -71,7 +71,7 @@ This is a **Text Embedding Explorer** - a modular web application for visualizin
    - Sets up global event handlers for HTML onclick attributes
 
 ### Key Dependencies
-- **Plotly.js**: Visualization library (loaded via CDN)
+- **D3.js**: Visualization library (loaded locally)
 - **OpenAI API**: External API for text analysis (requires user API key)
 - **http-server**: Dev dependency for static file serving
 
@@ -82,7 +82,7 @@ This is a **Text Embedding Explorer** - a modular web application for visualizin
 - **Global Functions**: UI event handlers exposed on window object
 
 ### Data Flow
-1. User interacts with Plotly visualization (selection)
+1. User interacts with D3 visualization (selection)
 2. VisualizationManager captures selection events
 3. UIManager updates analysis controls
 4. User configures analysis prompt and settings
@@ -103,5 +103,4 @@ This is a **Text Embedding Explorer** - a modular web application for visualizin
 - `index.html` - Main application entry point
 - `styles.css` - All application styles
 - `js/` - Modular JavaScript components
-- `prototype.html` & `script.js` - Legacy monolithic version (reference only)
-- `server.js` - Development server with CORS support
+- `prototype.html` & `script.js` - Legacy monolithic version (reference only)- `server.js` - Development server with CORS support
