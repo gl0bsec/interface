@@ -278,11 +278,11 @@ body {
     display: flex;
 }
 
-#selectionTab {
+#previewTab {
     gap: 0;
 }
 
-#selectionTab details:last-child {
+#previewTab details:last-child {
     margin-bottom: 0;
 }
 
@@ -302,7 +302,6 @@ body {
 .selection-info {
     padding: 20px;
     flex: 1;
-    overflow-y: auto;
     min-height: 0;
 }
 
@@ -478,6 +477,9 @@ details[open] .selection-info,
 details[open] .action-panel {
     flex: 1;
     min-height: 0;
+}
+
+details[open] .action-panel {
     overflow-y: auto;
 }
 
