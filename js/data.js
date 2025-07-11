@@ -1,6 +1,7 @@
 // Data management module
 export class DataManager {
     constructor() {
+        this.demoMode = true;
         this.sampleTexts = [
             { content: "Climate change impacts on coastal regions", category: "Environment", date: "2025-01-15", author: "Smith J.", sentiment: "Negative" },
             { content: "New AI breakthrough in language processing", category: "Technology", date: "2025-01-14", author: "Chen L.", sentiment: "Positive" },
@@ -28,6 +29,35 @@ export class DataManager {
         this.availableFields = this.extractAvailableFields();
         this.categories = this.getUniqueCategories();
     }
+
+    async loadCSVFile(file) {
+        const text = await file.text();
+        const rows = d3.csvParse(text);
+
+        if (!rows.columns.includes('x') || !rows.columns.includes('y')) {
+            throw new Error('CSV must contain x and y columns');
+        }
+
+        const hasCategory = rows.columns.includes('category');
+        this.embeddings = rows.map((row, i) => ({
+            ...row,
+            x: parseFloat(row.x),
+            y: parseFloat(row.y),
+            category: hasCategory ? row.category : 'Default',
+            index: i
+        }));
+
+        this.availableFields = this.extractAvailableFields();
+        this.categories = this.getUniqueCategories();
+        this.demoMode = false;
+    }
+
+    resetToSampleData() {
+        this.embeddings = this.generateEmbeddings();
+        this.availableFields = this.extractAvailableFields();
+        this.categories = this.getUniqueCategories();
+        this.demoMode = true;
+    }
     
     generateEmbeddings() {
         return this.sampleTexts.map((data, i) => ({
@@ -39,13 +69,15 @@ export class DataManager {
     }
     
     extractAvailableFields() {
-        return Object.keys(this.embeddings[0]).filter(key => 
+        if (!this.embeddings || this.embeddings.length === 0) return [];
+        return Object.keys(this.embeddings[0]).filter(key =>
             !['x', 'y', 'index'].includes(key)
         );
     }
     
     getUniqueCategories() {
-        return [...new Set(this.embeddings.map(e => e.category))];
+        if (!this.embeddings || this.embeddings.length === 0) return [];
+        return [...new Set(this.embeddings.map(e => e.category || 'Default'))];
     }
     
     getEmbeddings() {

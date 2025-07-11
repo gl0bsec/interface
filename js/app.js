@@ -47,7 +47,17 @@ class EmbeddingExplorerApp {
         window.zoomIn = () => this.visualizationManager.zoomIn();
         window.zoomOut = () => this.visualizationManager.zoomOut();
         window.resetZoom = () => this.visualizationManager.resetZoom();
-        
+
+        window.triggerUpload = () => document.getElementById('uploadInput').click();
+        window.handleFileInput = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                this.handleFileUpload(file);
+            }
+            e.target.value = '';
+        };
+        window.resetToDemoData = () => this.resetToDemoData();
+
     }
     
     initialize() {
@@ -55,6 +65,8 @@ class EmbeddingExplorerApp {
         this.visualizationManager.populateLegend();
         this.visualizationManager.updateVisualization();
         this.uiManager.updateAnalyzeButton();
+
+        this.setupDragAndDrop();
         
         // Handle window resize for visualization
         window.addEventListener('resize', () => {
@@ -68,6 +80,47 @@ class EmbeddingExplorerApp {
         
         
         console.log('Embedding Explorer App initialized successfully');
+    }
+
+    async handleFileUpload(file) {
+        try {
+            await this.dataManager.loadCSVFile(file);
+            this.visualizationManager.reloadData();
+            this.uiManager.populateFieldCheckboxes();
+            this.uiManager.updateAnalyzeButton();
+        } catch (err) {
+            alert('Failed to load dataset: ' + err.message);
+        }
+    }
+
+    resetToDemoData() {
+        this.dataManager.resetToSampleData();
+        this.visualizationManager.reloadData();
+        this.uiManager.populateFieldCheckboxes();
+        this.uiManager.updateAnalyzeButton();
+    }
+
+    setupDragAndDrop() {
+        const container = document.querySelector('.plot-container');
+        if (!container) return;
+
+        container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            container.classList.add('drag-over');
+        });
+
+        container.addEventListener('dragleave', () => {
+            container.classList.remove('drag-over');
+        });
+
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            container.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                this.handleFileUpload(file);
+            }
+        });
     }
     
     setupKeyboardShortcuts() {
@@ -123,4 +176,5 @@ class EmbeddingExplorerApp {
 
 // Initialize the application when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new EmbeddingExplorerApp();});
+    new EmbeddingExplorerApp();
+});

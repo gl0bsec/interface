@@ -546,7 +546,12 @@ export class D3VisualizationManager {
     }
     
     updateStats() {
+        const totalElement = document.getElementById('totalPoints');
         const selectedElement = document.getElementById('selectedPoints');
+
+        if (totalElement) {
+            totalElement.textContent = this.dataManager.getEmbeddings().length;
+        }
         if (selectedElement) {
             selectedElement.textContent = this.selectedIndices.size;
         }
@@ -706,5 +711,16 @@ export class D3VisualizationManager {
     getSelectedIndices() {
         return new Set(this.selectedIndices);
     }
-    
-    onSelectionChange = null;}
+
+    reloadData() {
+        this.svg.selectAll('*').remove();
+        this.selectedIndices.clear();
+        this.currentTransform = d3.zoomIdentity;
+        this.initializeVisualization();
+        this.populateLegend();
+        this.clearSelectionTools();
+        this.setupSelectionTool();
+    }
+
+    onSelectionChange = null;
+}
