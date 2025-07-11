@@ -31,7 +31,9 @@
                 <div id="tooltip" class="tooltip"></div>
             </div>
         </div>
-        
+
+        <div class="resize-handle" aria-hidden="true"></div>
+
         <div class="side-panel">
             <div class="panel-header">
                 <div class="panel-header-content">
@@ -42,6 +44,7 @@
                     </div>
                 </div>
                 <div class="panel-header-controls">
+                    <button id="collapseSidebarBtn" class="collapse-btn" title="Toggle sidebar" aria-label="Toggle sidebar">❮</button>
                     <button class="settings-btn" onclick="showSettings()" title="Settings" aria-label="Open settings">⚙</button>
                 </div>
             </div>
@@ -52,21 +55,27 @@
             </div>
             
             <div class="tab-content active" id="selectionTab">
-                <div class="selection-info">
-                    <div id="selectionPreview" role="region" aria-label="Selection preview" aria-live="polite">
-                        <p class="empty-state">
-                            Select points to view details
-                        </p>
+                <details id="selectionSection" open>
+                    <summary>Selection Preview</summary>
+                    <div class="selection-info">
+                        <div id="selectionPreview" role="region" aria-label="Selection preview" aria-live="polite">
+                            <p class="empty-state">
+                                Select points to view details
+                            </p>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="action-panel">
-                    <label for="promptInput" class="prompt-label">Analysis Prompt</label>
-                    <textarea class="prompt-input" id="promptInput" placeholder="Enter your analysis prompt..." aria-describedby="prompt-help">Analyze these items and identify common themes, patterns, or groupings.</textarea>
-                    <button class="button" id="analyzeBtn" onclick="showConfirmation()" disabled aria-describedby="analyze-help">
-                        Analyze Selection
-                    </button>
-                </div>
+                </details>
+
+                <details id="promptSection">
+                    <summary>Analysis Prompt</summary>
+                    <div class="action-panel">
+                        <label for="promptInput" class="prompt-label">Analysis Prompt</label>
+                        <textarea class="prompt-input" id="promptInput" placeholder="Enter your analysis prompt..." aria-describedby="prompt-help">Analyze these items and identify common themes, patterns, or groupings.</textarea>
+                        <button class="button" id="analyzeBtn" onclick="showConfirmation()" disabled aria-describedby="analyze-help">
+                            Analyze Selection
+                        </button>
+                    </div>
+                </details>
             </div>
             
             <div class="tab-content" id="categoriesTab">

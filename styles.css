@@ -4,6 +4,10 @@
     box-sizing: border-box;
 }
 
+:root {
+    --sidebar-width: 380px;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background-color: #0f0f0f;
@@ -13,7 +17,7 @@ body {
 
 .container {
     display: grid;
-    grid-template-columns: 1fr 380px;
+    grid-template-columns: 1fr 5px var(--sidebar-width);
     height: 100vh;
     width: 100vw;
     gap: 1px;
@@ -122,6 +126,20 @@ body {
     display: flex;
     flex-direction: column;
     border-left: 1px solid #2a2a2a;
+    width: var(--sidebar-width);
+    transition: width 0.2s ease;
+}
+
+.side-panel.disabled {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.resize-handle {
+    width: 5px;
+    cursor: col-resize;
+    background-color: #1a1a1a;
+    height: 100vh;
 }
 
 .panel-header {
@@ -141,6 +159,30 @@ body {
     display: flex;
     gap: 8px;
     align-items: flex-start;
+}
+
+.collapse-btn {
+    width: 36px;
+    height: 36px;
+    background-color: rgba(30, 30, 30, 0.95);
+    border: 2px solid #3a3a3a;
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s;
+    font-size: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.collapse-btn:hover {
+    background-color: rgba(50, 50, 50, 0.95);
+    border-color: #4a4a4a;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .categories-btn {
@@ -382,6 +424,40 @@ body {
     transform: none;
     box-shadow: none;
     border-color: #2a2a2a;
+}
+
+.spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+details {
+    margin-bottom: 16px;
+}
+
+details summary {
+    cursor: pointer;
+    font-weight: 600;
+    padding: 10px 20px;
+    background-color: #141414;
+    border-bottom: 1px solid #2a2a2a;
+    color: #e0e0e0;
+    list-style: none;
+}
+
+details[open] summary {
+    border-bottom: none;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 .modal {
