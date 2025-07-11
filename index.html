@@ -15,14 +15,14 @@
             <div class="visualization-header">
                 <div class="header-controls">
                     <div class="control-group">
-                        <button class="tool-btn active" data-mode="lasso" onclick="setSelectionMode('lasso')" title="Lasso Selection (Shift+L)">○</button>
-                        <button class="tool-btn" data-mode="box" onclick="setSelectionMode('box')" title="Box Selection (Shift+B)">□</button>
-                        <button class="tool-btn" id="clearBtn" onclick="clearSelection()" title="Clear Selection (Shift+C)">✕</button>
+                        <button class="tool-btn active" data-mode="lasso" onclick="setSelectionMode('lasso')" title="Lasso Selection (Shift+L)" aria-label="Lasso selection mode">○</button>
+                        <button class="tool-btn" data-mode="box" onclick="setSelectionMode('box')" title="Box Selection (Shift+B)" aria-label="Box selection mode">□</button>
+                        <button class="tool-btn" id="clearBtn" onclick="clearSelection()" title="Clear Selection (Shift+C)" aria-label="Clear selection">✕</button>
                     </div>
                     <div class="zoom-controls">
-                        <button class="tool-btn" id="zoomInBtn" onclick="zoomIn()" title="Zoom In (+)">+</button>
-                        <button class="tool-btn" id="zoomOutBtn" onclick="zoomOut()" title="Zoom Out (-)">−</button>
-                        <button class="tool-btn" id="resetBtn" onclick="resetZoom()" title="Reset Zoom (Home)">⌂</button>
+                        <button class="tool-btn" id="zoomInBtn" onclick="zoomIn()" title="Zoom In (+)" aria-label="Zoom in">+</button>
+                        <button class="tool-btn" id="zoomOutBtn" onclick="zoomOut()" title="Zoom Out (-)" aria-label="Zoom out">−</button>
+                        <button class="tool-btn" id="resetBtn" onclick="resetZoom()" title="Reset Zoom (Home)" aria-label="Reset zoom">⌂</button>
                     </div>
                 </div>
             </div>
@@ -71,9 +71,11 @@
                     <div class="action-panel">
                         <label for="promptInput" class="prompt-label">Analysis Prompt</label>
                         <textarea class="prompt-input" id="promptInput" placeholder="Enter your analysis prompt..." aria-describedby="prompt-help">Analyze these items and identify common themes, patterns, or groupings.</textarea>
+                        <p id="prompt-help" class="visually-hidden">Enter a prompt describing how the selection should be analyzed.</p>
                         <button class="button" id="analyzeBtn" onclick="showConfirmation()" disabled aria-describedby="analyze-help">
                             Analyze Selection
                         </button>
+                        <p id="analyze-help" class="visually-hidden">Send the selected points and prompt to the analysis service.</p>
                     </div>
                 </details>
             </div>

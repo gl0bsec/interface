@@ -434,10 +434,15 @@ export class D3VisualizationManager {
         const container = d3.select('.plot-container');
         const instructions = container.append('div')
             .attr('class', 'polygon-instructions')
+            .attr('role', 'status')
+            .attr('aria-live', 'polite')
+            .attr('tabindex', '-1')
             .html(`
                 <div><strong>Lasso Selection Mode</strong></div>
                 <div>Click to add vertices • Click first vertex or double-click to complete</div>
             `);
+
+        instructions.node().focus();
         
         // Auto-remove after 4 seconds
         setTimeout(() => {
