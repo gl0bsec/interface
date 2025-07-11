@@ -56,6 +56,12 @@ body {
     align-items: center;
 }
 
+.data-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
 .top-bar-left {
     display: flex;
     align-items: center;
@@ -72,6 +78,10 @@ body {
     position: relative;
     overflow: hidden;
     min-height: 0;
+}
+
+.plot-container.drag-over {
+    outline: 2px dashed #4a9eff;
 }
 
 #visualization {

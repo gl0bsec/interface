@@ -24,6 +24,11 @@
                         <button class="tool-btn" id="zoomOutBtn" onclick="zoomOut()" title="Zoom Out (-)" aria-label="Zoom out">−</button>
                         <button class="tool-btn" id="resetBtn" onclick="resetZoom()" title="Reset Zoom (Home)" aria-label="Reset zoom">⌂</button>
                     </div>
+                    <div class="data-controls">
+                        <button class="tool-btn" id="uploadBtn" onclick="triggerUpload()" title="Upload CSV Dataset" aria-label="Upload dataset">⬆</button>
+                        <button class="tool-btn" id="demoBtn" onclick="resetToDemoData()" title="Load Demo Data" aria-label="Load demo data">⟳</button>
+                        <input type="file" id="uploadInput" accept=".csv" style="display:none" onchange="handleFileInput(event)">
+                    </div>
                 </div>
             </div>
             <div class="plot-container">
