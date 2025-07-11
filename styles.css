@@ -1213,4 +1213,5 @@ textarea:focus-visible {
 
 @keyframes pulse {
     0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
-    50% { opacity: 0.5; transform: translateX(-50%) scale(1.2); }}
+    50% { opacity: 0.5; transform: translateX(-50%) scale(1.2); }
+}
