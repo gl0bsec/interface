@@ -55,11 +55,12 @@
             </div>
             
             <div class="panel-tabs">
-                <button class="tab-btn active" data-tab="selection">Selection</button>
+                <button class="tab-btn active" data-tab="preview">Preview</button>
+                <button class="tab-btn" data-tab="analysis">Analysis</button>
                 <button class="tab-btn" data-tab="categories">Categories</button>
             </div>
-            
-            <div class="tab-content active" id="selectionTab">
+
+            <div class="tab-content active" id="previewTab">
                 <details id="selectionSection" open>
                     <summary>Selection Preview</summary>
                     <div class="selection-info">
@@ -71,6 +72,9 @@
                     </div>
                 </details>
 
+            </div>
+
+            <div class="tab-content" id="analysisTab">
                 <details id="promptSection">
                     <summary>Analysis Prompt</summary>
                     <div class="action-panel">

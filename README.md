@@ -41,9 +41,9 @@ Text Embedding Explorer transforms text data into visual insights by plotting hi
 
 #### Analysis Workflow
 1. **Select Points**: Use keyboard shortcuts to choose selection mode, then click and drag on the plot
-2. **Review Selection**: All selected points appear in the preview panel on the right. Large selections are virtualized for smooth scrolling
+2. **Review Selection**: Open the **Preview** tab to see all selected points. Large selections are virtualized for smooth scrolling
 3. **Configure Analysis**: Click the settings icon (⚙) in the top-right of the sidebar to add your OpenAI API key
-4. **Analyze**: Enter your analysis prompt and click "Analyze Selection"
+4. **Analyze**: Switch to the **Analysis** tab, enter your prompt and click "Analyze Selection"
 
 ### Settings Configuration
 

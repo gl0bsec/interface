@@ -278,11 +278,11 @@ body {
     display: flex;
 }
 
-#selectionTab {
+#previewTab {
     gap: 0;
 }
 
-#selectionTab details:last-child {
+#previewTab details:last-child {
     margin-bottom: 0;
 }
 
