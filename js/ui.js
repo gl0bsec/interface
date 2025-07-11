@@ -5,6 +5,7 @@ export class UIManager {
         this.settingsManager = settingsManager;
         this.analysisManager = analysisManager;
         this.selectedIndices = new Set();
+        this.previewObserver = null;
         
         this.setupEventListeners();
         this.setupTabNavigation();
@@ -64,6 +65,11 @@ export class UIManager {
         const promptSection = document.getElementById('promptSection');
         if (!preview) return;
 
+        if (this.previewObserver) {
+            this.previewObserver.disconnect();
+            this.previewObserver = null;
+        }
+
         if (this.selectedIndices.size === 0) {
             preview.innerHTML = '<p class="empty-state">Select points to view details</p>';
             if (promptSection) promptSection.style.display = 'none';
@@ -75,45 +81,71 @@ export class UIManager {
         try {
             const settings = this.settingsManager.getSettings();
             const selectedItems = this.dataManager.getSelectedItems(this.selectedIndices);
-            
+
             if (!selectedItems || selectedItems.length === 0) {
                 preview.innerHTML = '<p class="empty-state">No data found for selected points</p>';
                 return;
             }
-            
-            const itemsToShow = selectedItems.slice(0, 10);
+
             const displayFields = settings.displayFields || ['content', 'category', 'date'];
-            
-            let itemsHtml = itemsToShow.map(item => {
+
+            const renderItem = (item) => {
                 let fieldHtml = displayFields.map(field => {
                     if (item && item[field] !== undefined) {
                         const sanitizedField = this.sanitizeHtml(field);
                         const sanitizedValue = this.sanitizeHtml(String(item[field]));
                         return `<div class="field-row">
-                            <span class="field-label">${sanitizedField}:</span> 
+                            <span class="field-label">${sanitizedField}:</span>
                             <span class="field-value">${sanitizedValue}</span>
                         </div>`;
                     }
                     return '';
                 }).filter(Boolean).join('');
-                
+
                 return fieldHtml ? `<div class="text-item">${fieldHtml}</div>` : '';
-            }).filter(Boolean).join('');
-            
-            if (!itemsHtml) {
-                preview.innerHTML = '<p class="empty-state">No displayable data for selected points</p>';
-                return;
-            }
-            
-            preview.innerHTML = `
-                <div class="selection-preview">
-                    <h4 style="margin-bottom: 12px; color: #e0e0e0;">Selected Items (${this.selectedIndices.size} total)</h4>
-                    ${itemsHtml}
-                    ${this.selectedIndices.size > 10 ? 
-                        `<p style="color: #888; text-align: center; margin-top: 12px; font-size: 14px;">... and ${this.selectedIndices.size - 10} more</p>` : 
-                        ''}
-                </div>
-            `;
+            };
+
+            const container = document.createElement('div');
+            container.className = 'selection-preview';
+            container.innerHTML = `<h4 style="margin-bottom: 12px; color: #e0e0e0;">Selected Items (${this.selectedIndices.size} total)</h4>`;
+
+            const listEl = document.createElement('div');
+            listEl.className = 'virtual-list';
+            container.appendChild(listEl);
+
+            preview.innerHTML = '';
+            preview.appendChild(container);
+
+            const batchSize = 50;
+            let index = 0;
+            const sentinel = document.createElement('div');
+            sentinel.className = 'sentinel';
+            listEl.appendChild(sentinel);
+
+            const loadBatch = () => {
+                const frag = document.createDocumentFragment();
+                for (let i = 0; i < batchSize && index < selectedItems.length; i++, index++) {
+                    const div = document.createElement('div');
+                    div.innerHTML = renderItem(selectedItems[index]);
+                    frag.appendChild(div.firstElementChild);
+                }
+                listEl.insertBefore(frag, sentinel);
+                if (index >= selectedItems.length) {
+                    observer.disconnect();
+                    sentinel.remove();
+                }
+            };
+
+            const observer = new IntersectionObserver(entries => {
+                if (entries[0].isIntersecting) {
+                    loadBatch();
+                }
+            }, { root: container });
+
+            loadBatch();
+            observer.observe(sentinel);
+            this.previewObserver = observer;
+
         } catch (error) {
             console.error('Error updating selection info:', error);
             preview.innerHTML = `<p style="color: #ff6b6b; text-align: center; padding: 20px;">Error: ${error.message}</p>`;
