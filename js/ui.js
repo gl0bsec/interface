@@ -8,6 +8,10 @@ export class UIManager {
         
         this.setupEventListeners();
         this.setupTabNavigation();
+        this.loadPromptFromStorage();
+        this.setupPromptPersistence();
+        this.loadSidebarWidth();
+        this.setupSidebarResize();
     }
     
     setupEventListeners() {
@@ -57,12 +61,16 @@ export class UIManager {
     
     updateSelectionInfo() {
         const preview = document.getElementById('selectionPreview');
+        const promptSection = document.getElementById('promptSection');
         if (!preview) return;
-        
+
         if (this.selectedIndices.size === 0) {
             preview.innerHTML = '<p class="empty-state">Select points to view details</p>';
+            if (promptSection) promptSection.style.display = 'none';
             return;
         }
+
+        if (promptSection) promptSection.style.display = 'block';
         
         try {
             const settings = this.settingsManager.getSettings();
@@ -133,6 +141,74 @@ export class UIManager {
             btn.disabled = false;
             btn.style.background = '';
             btn.style.borderColor = '';
+        }
+    }
+
+    loadPromptFromStorage() {
+        const saved = localStorage.getItem('analysisPrompt');
+        const input = document.getElementById('promptInput');
+        if (saved && input) {
+            input.value = saved;
+        }
+    }
+
+    setupPromptPersistence() {
+        const input = document.getElementById('promptInput');
+        if (!input) return;
+        input.addEventListener('input', () => {
+            localStorage.setItem('analysisPrompt', input.value);
+        });
+    }
+
+    loadSidebarWidth() {
+        const saved = localStorage.getItem('sidebarWidth');
+        if (saved) {
+            document.documentElement.style.setProperty('--sidebar-width', saved + 'px');
+        }
+    }
+
+    setupSidebarResize() {
+        const handle = document.querySelector('.resize-handle');
+        const root = document.documentElement;
+        if (!handle) return;
+
+        let isDragging = false;
+
+        handle.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            document.body.style.cursor = 'col-resize';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const container = document.querySelector('.container');
+            const rect = container.getBoundingClientRect();
+            const newWidth = Math.min(600, Math.max(200, rect.right - e.clientX));
+            root.style.setProperty('--sidebar-width', newWidth + 'px');
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+            isDragging = false;
+            document.body.style.cursor = '';
+            const width = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width'));
+            localStorage.setItem('sidebarWidth', width);
+        });
+
+        const collapseBtn = document.getElementById('collapseSidebarBtn');
+        collapseBtn?.addEventListener('click', () => this.toggleSidebar());
+    }
+
+    toggleSidebar() {
+        const root = document.documentElement;
+        const current = parseInt(getComputedStyle(root).getPropertyValue('--sidebar-width'));
+        if (current === 0) {
+            const saved = localStorage.getItem('sidebarWidth') || '380';
+            root.style.setProperty('--sidebar-width', saved + 'px');
+        } else {
+            localStorage.setItem('sidebarWidth', current);
+            root.style.setProperty('--sidebar-width', '0px');
         }
     }
     
@@ -342,14 +418,17 @@ export class UIManager {
     // Analysis button state management
     setAnalyzeButtonLoading(loading = true) {
         const btn = document.getElementById('analyzeBtn');
-        if (!btn) return;
-        
+        const side = document.querySelector('.side-panel');
+        if (!btn || !side) return;
+
         if (loading) {
             btn.disabled = true;
-            btn.textContent = 'Analyzing...';
+            btn.innerHTML = `<span class="spinner"></span>Analyzing...`;
+            side.classList.add('disabled');
         } else {
             btn.disabled = this.selectedIndices.size === 0 || !this.settingsManager.getSetting('apiKey');
-            btn.textContent = 'Analyze Selection';
+            btn.innerHTML = 'Analyze Selection';
+            side.classList.remove('disabled');
         }
     }
 }

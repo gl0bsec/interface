@@ -15,6 +15,8 @@ export class D3VisualizationManager {
             '#4a9eff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#f7b731',
             '#5f27cd', '#00d2d3', '#ff9ff3', '#54a0ff', '#48dbfb'
         ];
+
+        this.categoryFilters = {};
         
         this.margins = { top: 40, right: 40, bottom: 60, left: 60 };
 
@@ -651,16 +653,49 @@ export class D3VisualizationManager {
     populateLegend() {
         const legendPanel = document.getElementById('legendPanel');
         if (!legendPanel) return;
-        
+
         const categories = this.dataManager.getCategories();
-        const legendHtml = categories.map((cat, idx) => `
-            <div class="legend-item">
-                <div class="legend-color" style="background-color: ${this.categoryColors[idx % this.categoryColors.length]}"></div>
-                <span>${cat}</span>
-            </div>
-        `).join('');
-        
+        this.categoryFilters = {};
+
+        const legendHtml = categories.map((cat, idx) => {
+            this.categoryFilters[cat] = true;
+            return `
+                <label class="legend-item">
+                    <input type="checkbox" class="category-filter" data-category="${cat}" checked>
+                    <span class="legend-color" style="background-color: ${this.categoryColors[idx % this.categoryColors.length]}"></span>
+                    <span>${cat}</span>
+                </label>
+            `;
+        }).join('');
+
         legendPanel.innerHTML = legendHtml;
+
+        legendPanel.querySelectorAll('.category-filter').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const cat = cb.dataset.category;
+                this.categoryFilters[cat] = cb.checked;
+                this.updateCategoryVisibility();
+            });
+        });
+
+        this.updateCategoryVisibility();
+    }
+
+    updateCategoryVisibility() {
+        if (!this.points) return;
+        this.points.style('display', d => this.categoryFilters[d.category] ? null : 'none');
+
+        // Remove hidden items from selection
+        const toRemove = [];
+        this.selectedIndices.forEach(idx => {
+            const item = this.dataManager.getEmbeddingByIndex(idx);
+            if (item && !this.categoryFilters[item.category]) {
+                toRemove.push(idx);
+            }
+        });
+        toRemove.forEach(i => this.selectedIndices.delete(i));
+        this.updateVisualization();
+        this.onSelectionChange?.(this.selectedIndices);
     }
     
     getSelectedIndices() {
