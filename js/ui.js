@@ -63,6 +63,7 @@ export class UIManager {
     updateSelectionInfo() {
         const preview = document.getElementById('selectionPreview');
         const promptSection = document.getElementById('promptSection');
+        const selectionInfo = document.querySelector('.selection-info');
         if (!preview) return;
 
         if (this.previewObserver) {
@@ -73,10 +74,32 @@ export class UIManager {
         if (this.selectedIndices.size === 0) {
             preview.innerHTML = '<p class="empty-state">Select points to view details</p>';
             if (promptSection) promptSection.style.display = 'none';
+            // Reset to auto-height for empty state
+            if (selectionInfo) {
+                selectionInfo.style.maxHeight = 'none';
+                selectionInfo.style.overflowY = 'auto';
+            }
             return;
         }
 
         if (promptSection) promptSection.style.display = 'block';
+        
+        // Apply scrolling logic based on selection count
+        if (selectionInfo) {
+            if (this.selectedIndices.size > 5) {
+                // Force scrolling for large selections - using smaller threshold for testing
+                selectionInfo.style.maxHeight = '300px';
+                selectionInfo.style.overflowY = 'auto';
+                selectionInfo.style.overflowX = 'hidden';
+                console.log(`Applied scrolling for ${this.selectedIndices.size} items`);
+            } else {
+                // Allow natural expansion for small selections
+                selectionInfo.style.maxHeight = 'none';
+                selectionInfo.style.overflowY = 'auto';
+                selectionInfo.style.overflowX = 'hidden';
+                console.log(`Applied auto-height for ${this.selectedIndices.size} items`);
+            }
+        }
         
         try {
             const settings = this.settingsManager.getSettings();
@@ -106,45 +129,36 @@ export class UIManager {
             };
 
             const container = document.createElement('div');
-            container.className = 'selection-preview';
+            container.className = 'selection-preview-container';
             container.innerHTML = `<h4 style="margin-bottom: 12px; color: #e0e0e0;">Selected Items (${this.selectedIndices.size} total)</h4>`;
 
             const listEl = document.createElement('div');
-            listEl.className = 'virtual-list';
+            listEl.className = 'selection-items-list';
+            
+            // For large datasets, limit initial rendering and add "show more" functionality
+            const maxInitialItems = 1000;
+            const itemsToShow = selectedItems.length > maxInitialItems ? selectedItems.slice(0, maxInitialItems) : selectedItems;
+            
+            const itemsHtml = itemsToShow.map(item => renderItem(item)).join('');
+            listEl.innerHTML = itemsHtml;
+            
+            // Add "show more" button if there are more items
+            if (selectedItems.length > maxInitialItems) {
+                const showMoreBtn = document.createElement('button');
+                showMoreBtn.className = 'show-more-btn';
+                showMoreBtn.textContent = `Show ${selectedItems.length - maxInitialItems} more items`;
+                showMoreBtn.onclick = () => {
+                    const remainingItems = selectedItems.slice(maxInitialItems);
+                    const remainingHtml = remainingItems.map(item => renderItem(item)).join('');
+                    listEl.removeChild(showMoreBtn);
+                    listEl.innerHTML += remainingHtml;
+                };
+                listEl.appendChild(showMoreBtn);
+            }
+            
             container.appendChild(listEl);
-
             preview.innerHTML = '';
             preview.appendChild(container);
-
-            const batchSize = 50;
-            let index = 0;
-            const sentinel = document.createElement('div');
-            sentinel.className = 'sentinel';
-            listEl.appendChild(sentinel);
-
-            const loadBatch = () => {
-                const frag = document.createDocumentFragment();
-                for (let i = 0; i < batchSize && index < selectedItems.length; i++, index++) {
-                    const div = document.createElement('div');
-                    div.innerHTML = renderItem(selectedItems[index]);
-                    frag.appendChild(div.firstElementChild);
-                }
-                listEl.insertBefore(frag, sentinel);
-                if (index >= selectedItems.length) {
-                    observer.disconnect();
-                    sentinel.remove();
-                }
-            };
-
-            const observer = new IntersectionObserver(entries => {
-                if (entries[0].isIntersecting) {
-                    loadBatch();
-                }
-            }, { root: container });
-
-            loadBatch();
-            observer.observe(sentinel);
-            this.previewObserver = observer;
 
         } catch (error) {
             console.error('Error updating selection info:', error);

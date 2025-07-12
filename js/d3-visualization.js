@@ -232,38 +232,7 @@ export class D3VisualizationManager {
         window.addEventListener('resize', () => this.handleResize());
     }
     
-    setupKeyboardShortcuts() {
-        document.addEventListener('keydown', (event) => {
-            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
-
-            if (event.shiftKey) {
-                switch(event.key.toLowerCase()) {
-                    case 'l':
-                        this.setSelectionMode('lasso');
-                        break;
-                    case 'b':
-                        this.setSelectionMode('box');
-                        break;
-                    case 'c':
-                        this.clearSelection();
-                        break;
-                }
-            }
-
-            switch(event.key) {
-                case '+':
-                case '=':
-                    this.zoomIn();
-                    break;
-                case '-':
-                    this.zoomOut();
-                    break;
-                case 'Home':
-                    this.resetZoom();
-                    break;
-            }
-        });
-    }
+    // Keyboard shortcuts are handled by App.js to avoid conflicts
     
     setSelectionMode(mode) {
         // Allow legacy values from the prototype
@@ -301,7 +270,7 @@ export class D3VisualizationManager {
             .extent([[60, 40], [this.width - 40, this.height - 60]])
             .on('start', () => {
                 // Prevent zoom events during brushing
-                this.svg.on('.zoom', null);
+                this.disableZoom();
             })
             .on('brush', (event) => {
                 // Prevent any movement during brushing
@@ -310,7 +279,8 @@ export class D3VisualizationManager {
             .on('end', (event) => {
                 if (!event.selection) {
                     // Re-enable zoom when brush is cleared
-                    this.svg.call(this.zoom);
+                    this.enableZoom();
+                    this.resetCursor();
                     return;
                 }
                 
@@ -334,9 +304,10 @@ export class D3VisualizationManager {
                 
                 this.updateSelection(selected);
                 
-                // Clear the brush and re-enable zoom
+                // Clear the brush and properly restore zoom/cursor
                 brushGroup.call(this.brush.clear);
-                this.svg.call(this.zoom);
+                this.enableZoom();
+                this.resetCursor();
             });
             
         brushGroup.call(this.brush);
@@ -344,7 +315,7 @@ export class D3VisualizationManager {
     
     setupPolygonSelection() {
         // Disable zoom during polygon selection
-        this.svg.on('.zoom', null);
+        this.disableZoom();
         
         // Show instruction overlay
         this.showPolygonInstructions();
@@ -472,9 +443,11 @@ export class D3VisualizationManager {
         this.polygonPoints = [];
         this.isPolygonSelecting = false;
         this.svg.selectAll('.polygon-selection').remove();
+        d3.select('.polygon-instructions').remove();
         
-        // Re-enable zoom
-        this.svg.call(this.zoom);
+        // Re-enable zoom and reset cursor
+        this.enableZoom();
+        this.resetCursor();
     }
     
     pointInPolygon(point, polygon) {
@@ -501,13 +474,17 @@ export class D3VisualizationManager {
         this.svg.on('mouseup', null);
         this.svg.on('click', null);
         this.svg.on('dblclick', null);
+        this.svg.on('.zoom', null); // Clear any existing zoom handlers
         
         // Reset polygon state
         this.polygonPoints = [];
         this.isPolygonSelecting = false;
         
-        // Re-enable zoom
-        this.svg.call(this.zoom);
+        // Re-enable zoom properly
+        this.enableZoom();
+        
+        // Reset cursor state
+        this.resetCursor();
     }
     
     togglePoint(index, event) {
@@ -537,12 +514,27 @@ export class D3VisualizationManager {
     
     updateVisualization() {
         this.points
-            .attr('r', (d, i) => this.selectedIndices.has(i) ? 8 : 6)
-            .attr('stroke-width', (d, i) => this.selectedIndices.has(i) ? 3 : 1)
-            .attr('stroke', (d, i) => this.selectedIndices.has(i) ? '#ff6b6b' : '#000')
-            .attr('opacity', (d, i) => this.selectedIndices.has(i) ? 1 : 0.7);
+            .attr('r', (_, i) => this.selectedIndices.has(i) ? 8 : 6)
+            .attr('stroke-width', (_, i) => this.selectedIndices.has(i) ? 3 : 1)
+            .attr('stroke', (_, i) => this.selectedIndices.has(i) ? '#ff6b6b' : '#000')
+            .attr('opacity', (_, i) => this.selectedIndices.has(i) ? 1 : 0.7);
         
         this.updateStats();
+    }
+    
+    // Helper methods for zoom and cursor management
+    enableZoom() {
+        this.svg.call(this.zoom);
+    }
+    
+    disableZoom() {
+        this.svg.on('.zoom', null);
+    }
+    
+    resetCursor() {
+        // Reset cursor on the main plot area
+        this.svg.select('.plot-background').style('cursor', 'default');
+        this.container.style('cursor', 'default');
     }
     
     updateStats() {
