@@ -22,6 +22,7 @@ class EmbeddingExplorerApp {
         // Set up circular dependency
         this.analysisManager.setUIManager(this.uiManager);
         this.visualizationManager = new VisualizationManager(this.dataManager);
+        this.uiManager.setVisualizationManager(this.visualizationManager);
         
         // Setup inter-module communication
         this.visualizationManager.onSelectionChange = (selectedIndices) => {

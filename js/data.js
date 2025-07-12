@@ -116,4 +116,21 @@ export class DataManager {
                 return filteredItem;
             });
     }
+
+    getFieldType(field) {
+        const values = this.embeddings.map(e => e[field]).filter(v => v !== undefined);
+        const numeric = values.every(v => !isNaN(parseFloat(v)) && v !== '');
+        return numeric ? 'numeric' : 'categorical';
+    }
+
+    getUniqueValues(field) {
+        return [...new Set(this.embeddings.map(e => e[field]))];
+    }
+
+    getNumericRange(field) {
+        const nums = this.embeddings
+            .map(e => parseFloat(e[field]))
+            .filter(v => !isNaN(v));
+        return { min: Math.min(...nums), max: Math.max(...nums) };
+    }
 }
