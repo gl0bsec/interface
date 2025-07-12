@@ -17,6 +17,10 @@ export class D3VisualizationManager {
         ];
 
         this.categoryFilters = {};
+
+        const fields = this.dataManager.getAvailableFields();
+        this.colorField = fields.includes('category') ? 'category' : fields[0];
+        this.colorFieldType = this.dataManager.getFieldType(this.colorField);
         
         this.margins = { top: 40, right: 40, bottom: 60, left: 60 };
 
@@ -48,9 +52,7 @@ export class D3VisualizationManager {
             .domain(d3.extent(embeddings, d => d.y))
             .range([this.height - 60, 40]);
         
-        this.colorScale = d3.scaleOrdinal()
-            .domain(this.dataManager.getCategories())
-            .range(this.categoryColors);
+        this.updateColorScale();
         
         this.createBackground();
         this.createPoints();
@@ -137,7 +139,7 @@ export class D3VisualizationManager {
             .attr('cx', d => this.xScale(d.x))
             .attr('cy', d => this.yScale(d.y))
             .attr('r', 6)
-            .attr('fill', d => this.colorScale(d.category))
+            .attr('fill', d => this.colorScale(d[this.colorField]))
             .attr('stroke', '#000')
             .attr('stroke-width', 1)
             .attr('opacity', 0.8)
@@ -518,6 +520,7 @@ export class D3VisualizationManager {
             .attr('stroke-width', (_, i) => this.selectedIndices.has(i) ? 3 : 1)
             .attr('stroke', (_, i) => this.selectedIndices.has(i) ? '#ff6b6b' : '#000')
             .attr('opacity', (_, i) => this.selectedIndices.has(i) ? 1 : 0.7);
+        this.updatePointColors();
         
         this.updateStats();
     }
@@ -650,47 +653,86 @@ export class D3VisualizationManager {
             .attr('width', this.width)
             .attr('height', m.bottom);
     }
+
+    updateColorScale() {
+        this.colorFieldType = this.dataManager.getFieldType(this.colorField);
+        if (this.colorFieldType === 'numeric') {
+            const range = this.dataManager.getNumericRange(this.colorField);
+            this.colorScale = d3.scaleSequential(d3.interpolateViridis)
+                .domain([range.min, range.max]);
+        } else {
+            const categories = this.dataManager.getUniqueValues(this.colorField);
+            this.colorScale = d3.scaleOrdinal()
+                .domain(categories)
+                .range(this.categoryColors);
+        }
+    }
+
+    updatePointColors() {
+        if (!this.points) return;
+        this.points.attr('fill', d => this.colorScale(d[this.colorField]));
+    }
+
+    updateColorField(field) {
+        this.colorField = field;
+        this.updateColorScale();
+        this.updatePointColors();
+        this.populateLegend();
+    }
+
+    getColorField() {
+        return this.colorField;
+    }
     
     populateLegend() {
         const legendPanel = document.getElementById('legendPanel');
         if (!legendPanel) return;
 
-        const categories = this.dataManager.getCategories();
-        this.categoryFilters = {};
+        legendPanel.innerHTML = '';
 
-        const legendHtml = categories.map((cat, idx) => {
-            this.categoryFilters[cat] = true;
-            return `
-                <label class="legend-item">
-                    <input type="checkbox" class="category-filter" data-category="${cat}" checked>
-                    <span class="legend-color" style="background-color: ${this.categoryColors[idx % this.categoryColors.length]}"></span>
-                    <span>${cat}</span>
-                </label>
-            `;
-        }).join('');
+        if (this.colorFieldType === 'numeric') {
+            const range = this.dataManager.getNumericRange(this.colorField);
+            const startColor = this.colorScale(range.min);
+            const endColor = this.colorScale(range.max);
+            legendPanel.innerHTML = `
+                <div class="legend-gradient">
+                    <div class="gradient-bar" style="background: linear-gradient(to right, ${startColor}, ${endColor});"></div>
+                    <div class="gradient-labels"><span>${range.min.toFixed(2)}</span><span>${range.max.toFixed(2)}</span></div>
+                </div>`;
+        } else {
+            const categories = this.dataManager.getUniqueValues(this.colorField);
+            this.categoryFilters = {};
+            const legendHtml = categories.map((cat, idx) => {
+                this.categoryFilters[cat] = true;
+                return `
+                    <label class="legend-item">
+                        <input type="checkbox" class="category-filter" data-category="${cat}" checked>
+                        <span class="legend-color" style="background-color: ${this.categoryColors[idx % this.categoryColors.length]}"></span>
+                        <span>${cat}</span>
+                    </label>`;
+            }).join('');
+            legendPanel.innerHTML = legendHtml;
 
-        legendPanel.innerHTML = legendHtml;
-
-        legendPanel.querySelectorAll('.category-filter').forEach(cb => {
-            cb.addEventListener('change', () => {
-                const cat = cb.dataset.category;
-                this.categoryFilters[cat] = cb.checked;
-                this.updateCategoryVisibility();
+            legendPanel.querySelectorAll('.category-filter').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const cat = cb.dataset.category;
+                    this.categoryFilters[cat] = cb.checked;
+                    this.updateCategoryVisibility();
+                });
             });
-        });
 
-        this.updateCategoryVisibility();
+            this.updateCategoryVisibility();
+        }
     }
 
     updateCategoryVisibility() {
-        if (!this.points) return;
-        this.points.style('display', d => this.categoryFilters[d.category] ? null : 'none');
+        if (!this.points || this.colorFieldType !== 'categorical') return;
+        this.points.style('display', d => this.categoryFilters[d[this.colorField]] ? null : 'none');
 
-        // Remove hidden items from selection
         const toRemove = [];
         this.selectedIndices.forEach(idx => {
             const item = this.dataManager.getEmbeddingByIndex(idx);
-            if (item && !this.categoryFilters[item.category]) {
+            if (item && !this.categoryFilters[item[this.colorField]]) {
                 toRemove.push(idx);
             }
         });
@@ -707,6 +749,8 @@ export class D3VisualizationManager {
         this.svg.selectAll('*').remove();
         this.selectedIndices.clear();
         this.currentTransform = d3.zoomIdentity;
+        const fields = this.dataManager.getAvailableFields();
+        this.colorField = fields.includes('category') ? 'category' : fields[0];
         this.initializeVisualization();
         this.populateLegend();
         this.clearSelectionTools();

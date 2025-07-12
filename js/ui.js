@@ -6,6 +6,7 @@ export class UIManager {
         this.analysisManager = analysisManager;
         this.selectedIndices = new Set();
         this.previewObserver = null;
+        this.visualizationManager = null;
         
         this.setupEventListeners();
         this.setupTabNavigation();
@@ -13,6 +14,12 @@ export class UIManager {
         this.setupPromptPersistence();
         this.loadSidebarWidth();
         this.setupSidebarResize();
+    }
+
+    setVisualizationManager(visManager) {
+        this.visualizationManager = visManager;
+        this.populateColorFieldOptions();
+        this.setupColorFieldListener();
     }
     
     setupEventListeners() {
@@ -347,7 +354,7 @@ export class UIManager {
     populateFieldCheckboxes() {
         const displayGroup = document.getElementById('displayFieldsGroup');
         const apiGroup = document.getElementById('apiFieldsGroup');
-        
+
         if (!displayGroup || !apiGroup) return;
         
         const availableFields = this.dataManager.getAvailableFields();
@@ -376,6 +383,27 @@ export class UIManager {
                 <label for="api_${field}">${field.charAt(0).toUpperCase() + field.slice(1)}</label>
             `;
             apiGroup.appendChild(apiItem);
+        });
+
+        this.populateColorFieldOptions();
+    }
+
+    populateColorFieldOptions() {
+        const select = document.getElementById('colorFieldSelect');
+        if (!select) return;
+        const fields = this.dataManager.getAvailableFields();
+        select.innerHTML = fields.map(f => `<option value="${f}">${f}</option>`).join('');
+        if (this.visualizationManager) {
+            select.value = this.visualizationManager.getColorField();
+        }
+    }
+
+    setupColorFieldListener() {
+        const select = document.getElementById('colorFieldSelect');
+        if (!select) return;
+        select.addEventListener('change', () => {
+            const field = select.value;
+            this.visualizationManager?.updateColorField(field);
         });
     }
     
