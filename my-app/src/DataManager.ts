@@ -1,7 +1,10 @@
 export interface DataItem {
   x: number;
   y: number;
-  [key: string]: any;
+  index?: number;
+  content?: string;
+  category?: string;
+  [key: string]: unknown;
 }
 
 export class DataManager {
@@ -58,7 +61,7 @@ export class DataManager {
       const item: DataItem = { x, y, index: i } as DataItem;
       header.forEach((key, j) => {
         if (j !== xIdx && j !== yIdx) {
-          (item as any)[key] = cols[j];
+          (item as Record<string, unknown>)[key] = cols[j];
         }
       });
       if (categoryIdx === -1) item.category = 'Default';
@@ -83,14 +86,14 @@ export class DataManager {
     }));
   }
 
-  private extractAvailableFields() {
-    if (!this.embeddings.length) return [] as string[];
+  private extractAvailableFields(): string[] {
+    if (!this.embeddings.length) return [];
     return Object.keys(this.embeddings[0]).filter(k => !['x', 'y', 'index'].includes(k));
   }
 
-  private getUniqueCategories() {
-    if (!this.embeddings.length) return [] as string[];
-    return Array.from(new Set(this.embeddings.map(e => e.category || 'Default')));
+  private getUniqueCategories(): string[] {
+    if (!this.embeddings.length) return [];
+    return Array.from(new Set(this.embeddings.map(e => e.category ?? 'Default')));
   }
 
   getEmbeddings() { return this.embeddings; }
