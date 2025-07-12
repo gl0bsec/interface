@@ -10,6 +10,7 @@ export class D3VisualizationManager {
         this.polygonPoints = [];
         this.isPolygonSelecting = false;
         this.currentTransform = d3.zoomIdentity;
+        this._hoverIndex = null;
         
         this.categoryColors = [
             '#4a9eff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#f7b731',
@@ -144,8 +145,16 @@ export class D3VisualizationManager {
             .attr('stroke-width', 1)
             .attr('opacity', 0.8)
             .style('cursor', 'pointer')
-            .on('mouseover', (event, d) => this.showTooltip(event, d))
-            .on('mouseout', () => this.hideTooltip())
+            .on('mouseover', (event, d) => {
+                this.showTooltip(event, d);
+                this.highlightPoint(d.index);
+                this.onHover?.(d.index);
+            })
+            .on('mouseout', () => {
+                this.hideTooltip();
+                this.clearHighlight();
+                this.onHoverEnd?.();
+            })
             .on('click', (event, d) => this.togglePoint(d.index, event));
     }
 
@@ -521,8 +530,30 @@ export class D3VisualizationManager {
             .attr('stroke', (_, i) => this.selectedIndices.has(i) ? '#ff6b6b' : '#000')
             .attr('opacity', (_, i) => this.selectedIndices.has(i) ? 1 : 0.7);
         this.updatePointColors();
-        
+
         this.updateStats();
+    }
+
+    highlightPoint(index) {
+        if (!this.points) return;
+        if (this._hoverIndex !== undefined) {
+            this.points.filter((d, i) => i === this._hoverIndex)
+                .attr('r', d => this.selectedIndices.has(d.index) ? 8 : 6)
+                .attr('stroke', d => this.selectedIndices.has(d.index) ? '#ff6b6b' : '#000')
+                .attr('stroke-width', d => this.selectedIndices.has(d.index) ? 3 : 1);
+        }
+        if (index !== null && index !== undefined) {
+            this.points.filter((d, i) => i === index)
+                .attr('r', 9)
+                .attr('stroke', '#ffd54f')
+                .attr('stroke-width', 3)
+                .raise();
+        }
+        this._hoverIndex = index;
+    }
+
+    clearHighlight() {
+        this.highlightPoint(null);
     }
     
     // Helper methods for zoom and cursor management
@@ -758,4 +789,6 @@ export class D3VisualizationManager {
     }
 
     onSelectionChange = null;
+    onHover = null;
+    onHoverEnd = null;
 }
