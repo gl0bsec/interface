@@ -305,7 +305,7 @@ export class D3VisualizationManager {
                 this.updateSelection(selected);
                 
                 // Clear the brush and properly restore zoom/cursor
-                brushGroup.call(this.brush.clear);
+                brushGroup.call(this.brush.move, null);
                 this.enableZoom();
                 this.resetCursor();
             });
