@@ -13,6 +13,7 @@ export class UIManager {
         this.loadPromptFromStorage();
         this.setupPromptPersistence();
         this.loadSidebarWidth();
+        this.loadTheme();
         this.setupSidebarResize();
     }
 
@@ -132,7 +133,7 @@ export class UIManager {
                     return '';
                 }).filter(Boolean).join('');
 
-                return fieldHtml ? `<div class="text-item">${fieldHtml}</div>` : '';
+                return fieldHtml;
             };
 
             const container = document.createElement('div');
@@ -146,8 +147,21 @@ export class UIManager {
             const maxInitialItems = 1000;
             const itemsToShow = selectedItems.length > maxInitialItems ? selectedItems.slice(0, maxInitialItems) : selectedItems;
             
-            const itemsHtml = itemsToShow.map(item => renderItem(item)).join('');
-            listEl.innerHTML = itemsHtml;
+            itemsToShow.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'text-item';
+                div.dataset.index = item.index;
+                div.innerHTML = renderItem(item);
+                div.addEventListener('mouseover', () => {
+                    div.classList.add('hovered');
+                    this.visualizationManager?.highlightPoint(item.index);
+                });
+                div.addEventListener('mouseout', () => {
+                    div.classList.remove('hovered');
+                    this.visualizationManager?.clearHighlight();
+                });
+                listEl.appendChild(div);
+            });
             
             // Add "show more" button if there are more items
             if (selectedItems.length > maxInitialItems) {
@@ -220,6 +234,13 @@ export class UIManager {
         }
     }
 
+    loadTheme() {
+        const theme = localStorage.getItem('theme');
+        if (theme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+        }
+    }
+
     setupSidebarResize() {
         const handle = document.querySelector('.resize-handle');
         const root = document.documentElement;
@@ -228,6 +249,8 @@ export class UIManager {
         let isDragging = false;
 
         handle.addEventListener('mousedown', (e) => {
+            const sidebar = document.querySelector('.side-panel');
+            if (sidebar?.classList.contains('sidebar-hidden')) return;
             isDragging = true;
             document.body.style.cursor = 'col-resize';
             e.preventDefault();
@@ -235,6 +258,8 @@ export class UIManager {
 
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
+            const sidebar = document.querySelector('.side-panel');
+            if (sidebar?.classList.contains('sidebar-hidden')) return;
             const container = document.querySelector('.container');
             const rect = container.getBoundingClientRect();
             const newWidth = Math.min(600, Math.max(200, rect.right - e.clientX));
@@ -255,13 +280,30 @@ export class UIManager {
 
     toggleSidebar() {
         const root = document.documentElement;
-        const current = parseInt(getComputedStyle(root).getPropertyValue('--sidebar-width'));
-        if (current === 0) {
+        const sidebar = document.querySelector('.side-panel');
+        if (!sidebar) return;
+
+        const hidden = sidebar.classList.contains('sidebar-hidden');
+        if (hidden) {
             const saved = localStorage.getItem('sidebarWidth') || '380';
             root.style.setProperty('--sidebar-width', saved + 'px');
+            sidebar.classList.remove('sidebar-hidden');
         } else {
+            const current = parseInt(getComputedStyle(root).getPropertyValue('--sidebar-width'));
             localStorage.setItem('sidebarWidth', current);
-            root.style.setProperty('--sidebar-width', '0px');
+            sidebar.classList.add('sidebar-hidden');
+        }
+    }
+
+    toggleTheme() {
+        const root = document.documentElement;
+        const light = root.getAttribute('data-theme') === 'light';
+        if (light) {
+            root.removeAttribute('data-theme');
+            localStorage.removeItem('theme');
+        } else {
+            root.setAttribute('data-theme', 'light');
+            localStorage.setItem('theme', 'light');
         }
     }
     
@@ -504,5 +546,17 @@ export class UIManager {
             btn.innerHTML = 'Analyze Selection';
             side.classList.remove('disabled');
         }
+    }
+
+    highlightListItem(index) {
+        document.querySelectorAll('.text-item.hovered').forEach(el => el.classList.remove('hovered'));
+        const el = document.querySelector(`.text-item[data-index="${index}"]`);
+        if (el) {
+            el.classList.add('hovered');
+        }
+    }
+
+    clearListHighlight() {
+        document.querySelectorAll('.text-item.hovered').forEach(el => el.classList.remove('hovered'));
     }
 }

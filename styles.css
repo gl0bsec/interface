@@ -6,12 +6,32 @@
 
 :root {
     --sidebar-width: 380px;
+
+    --color-bg: #0f0f0f;
+    --color-panel: #1a1a1a;
+    --color-accent: #4a9eff;
+    --color-border: #2a2a2a;
+    --color-border-strong: #3a3a3a;
+    --color-text: #e0e0e0;
+    --color-text-muted: #aaa;
+    --color-hover: #2a2a2a;
+}
+
+[data-theme='light'] {
+    --color-bg: #ffffff;
+    --color-panel: #f0f0f0;
+    --color-accent: #0066cc;
+    --color-border: #cccccc;
+    --color-border-strong: #bbbbbb;
+    --color-text: #222222;
+    --color-text-muted: #555555;
+    --color-hover: #e5e5e5;
 }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #0f0f0f;
-    color: #e0e0e0;
+    background-color: var(--color-bg);
+    color: var(--color-text);
     overflow: hidden;
 }
 
@@ -21,12 +41,12 @@ body {
     height: 100vh;
     width: 100vw;
     gap: 1px;
-    background-color: #1a1a1a;
+    background-color: var(--color-border);
     overflow: hidden;
 }
 
 .main-panel {
-    background-color: #0a0a0a;
+    background-color: var(--color-bg);
     position: relative;
     overflow: hidden;
     display: flex;
@@ -35,8 +55,8 @@ body {
 }
 
 .visualization-header {
-    background-color: #1a1a1a;
-    border-bottom: 1px solid #2a2a2a;
+    background-color: var(--color-panel);
+    border-bottom: 1px solid var(--color-border);
     padding: 12px 20px;
     display: flex;
     justify-content: space-between;
@@ -133,12 +153,12 @@ body {
 }
 
 .side-panel {
-    background-color: #0f0f0f;
+    background-color: var(--color-bg);
     display: flex;
     flex-direction: column;
-    border-left: 1px solid #2a2a2a;
+    border-left: 1px solid var(--color-border);
     width: var(--sidebar-width);
-    transition: width 0.2s ease;
+    transition: width 0.2s ease, transform 0.3s ease;
     height: 100vh;
     overflow: hidden;
 }
@@ -148,17 +168,21 @@ body {
     opacity: 0.6;
 }
 
+.side-panel.sidebar-hidden {
+    transform: translateX(100%);
+}
+
 .resize-handle {
     width: 5px;
     cursor: col-resize;
-    background-color: #1a1a1a;
+    background-color: var(--color-panel);
     height: 100vh;
 }
 
 .panel-header {
     padding: 20px;
-    border-bottom: 2px solid #3a3a3a;
-    background-color: #1a1a1a;
+    border-bottom: 2px solid var(--color-border-strong);
+    background-color: var(--color-panel);
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
@@ -178,7 +202,7 @@ body {
     width: 36px;
     height: 36px;
     background-color: rgba(30, 30, 30, 0.95);
-    border: 2px solid #3a3a3a;
+    border: 2px solid var(--color-border-strong);
     border-radius: 8px;
     color: #ffffff;
     cursor: pointer;
@@ -193,7 +217,7 @@ body {
 
 .collapse-btn:hover {
     background-color: rgba(50, 50, 50, 0.95);
-    border-color: #4a4a4a;
+    border-color: var(--color-border-strong);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
@@ -202,7 +226,7 @@ body {
     width: 36px;
     height: 36px;
     background-color: rgba(30, 30, 30, 0.95);
-    border: 2px solid #3a3a3a;
+    border: 2px solid var(--color-border-strong);
     border-radius: 8px;
     color: #ffffff;
     cursor: pointer;
@@ -239,8 +263,8 @@ body {
 
 .panel-tabs {
     display: flex;
-    background-color: #1a1a1a;
-    border-bottom: 1px solid #2a2a2a;
+    background-color: var(--color-panel);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .tab-btn {
@@ -262,8 +286,8 @@ body {
 }
 
 .tab-btn.active {
-    color: #4a9eff;
-    border-bottom-color: #4a9eff;
+    color: var(--color-accent);
+    border-bottom-color: var(--color-accent);
     background-color: rgba(74, 158, 255, 0.1);
 }
 
@@ -414,19 +438,24 @@ body {
 .text-item {
     padding: 12px 16px;
     margin-bottom: 8px;
-    background-color: #1a1a1a;
+    background-color: var(--color-panel);
     border-radius: 6px;
     font-size: 14px;
     line-height: 1.6;
-    border: 2px solid #3a3a3a;
+    border: 2px solid var(--color-border-strong);
     transition: all 0.2s;
-    color: #ffffff;
+    color: var(--color-text);
 }
 
 .text-item:hover {
-    background-color: #2a2a2a;
-    border-color: #4a4a4a;
+    background-color: var(--color-hover);
+    border-color: var(--color-border-strong);
     transform: translateX(2px);
+}
+
+.text-item.hovered {
+    background-color: var(--color-hover);
+    border-color: var(--color-accent);
 }
 
 .field-label {
@@ -474,7 +503,7 @@ body {
 
 .prompt-input:focus {
     outline: none;
-    border-color: #4a9eff;
+    border-color: var(--color-accent);
     background-color: #222222;
     box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
 }
@@ -486,7 +515,7 @@ body {
 .button {
     width: 100%;
     padding: 14px 20px;
-    background: linear-gradient(135deg, #4a9eff, #0066cc);
+    background: linear-gradient(135deg, var(--color-accent), #0066cc);
     color: white;
     border: 2px solid transparent;
     border-radius: 8px;
@@ -691,7 +720,7 @@ details[open] summary {
     width: 36px;
     height: 36px;
     background-color: rgba(30, 30, 30, 0.95);
-    border: 2px solid #3a3a3a;
+    border: 2px solid var(--color-border-strong);
     border-radius: 8px;
     color: #ffffff;
     cursor: pointer;
@@ -707,7 +736,7 @@ details[open] summary {
 
 .settings-btn:hover {
     background-color: rgba(50, 50, 50, 0.95);
-    border-color: #4a4a4a;
+    border-color: var(--color-border-strong);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
@@ -1013,8 +1042,8 @@ details[open] summary {
 
 .tool-btn {
     padding: 8px 12px;
-    background-color: #2a2a2a;
-    border: 2px solid #3a3a3a;
+    background-color: var(--color-hover);
+    border: 2px solid var(--color-border-strong);
     border-radius: 6px;
     color: #ffffff;
     cursor: pointer;
@@ -1030,17 +1059,35 @@ details[open] summary {
 }
 
 .tool-btn:hover {
-    background-color: #3a3a3a;
-    border-color: #4a4a4a;
+    background-color: var(--color-border-strong);
+    border-color: var(--color-border-strong);
     transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 .tool-btn.active {
-    background: linear-gradient(135deg, #4a9eff, #0066cc);
+    background: linear-gradient(135deg, var(--color-accent), #0066cc);
     border-color: #0066cc;
     color: white;
     box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+}
+
+.tool-btn svg {
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+}
+
+.settings-btn svg {
+    width: 18px;
+    height: 18px;
+    pointer-events: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
 }
 
 .results-panel {

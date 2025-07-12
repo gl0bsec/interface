@@ -15,7 +15,7 @@ export default function SettingsModal({ manager, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
-      <div className="bg-white text-black p-6 rounded shadow w-80 space-y-4">
+      <div className="bg-white dark:bg-neutral-800 text-black dark:text-white p-6 rounded-lg shadow-xl w-80 space-y-4 transition">
         <h3 className="text-lg font-semibold">Settings</h3>
         <label className="block text-sm">
           API Key
