@@ -28,6 +28,8 @@ class EmbeddingExplorerApp {
         this.visualizationManager.onSelectionChange = (selectedIndices) => {
             this.uiManager.updateSelectedIndices(selectedIndices);
         };
+        this.visualizationManager.onHover = (idx) => this.uiManager.highlightListItem(idx);
+        this.visualizationManager.onHoverEnd = () => this.uiManager.clearListHighlight();
     }
     
     setupGlobalEventHandlers() {
@@ -61,6 +63,7 @@ class EmbeddingExplorerApp {
             e.target.value = '';
         };
         window.resetToDemoData = () => this.resetToDemoData();
+        window.toggleTheme = () => this.uiManager.toggleTheme();
 
     }
     
