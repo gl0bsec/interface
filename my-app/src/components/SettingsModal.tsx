@@ -14,31 +14,66 @@ export default function SettingsModal({ manager, onClose }: Props) {
   const [maxTokens, setMaxTokens] = useState(initial.maxTokens);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)' }}>
-      <div style={{ margin: '100px auto', padding: 20, background: '#fff', maxWidth: 400 }}>
-        <h3>Settings</h3>
-        <label>API Key
-          <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} />
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+      <div className="bg-white text-black p-6 rounded shadow w-80 space-y-4">
+        <h3 className="text-lg font-semibold">Settings</h3>
+        <label className="block text-sm">
+          API Key
+          <input
+            type="password"
+            className="mt-1 w-full border rounded px-2 py-1"
+            value={apiKey}
+            onChange={e => setApiKey(e.target.value)}
+          />
         </label>
-        <label>Model
-          <select value={model} onChange={e => setModel(e.target.value)}>
+        <label className="block text-sm">
+          Model
+          <select
+            className="mt-1 w-full border rounded px-2 py-1"
+            value={model}
+            onChange={e => setModel(e.target.value)}
+          >
             <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
             <option value="gpt-4">GPT-4</option>
             <option value="gpt-4-turbo-preview">GPT-4 Turbo</option>
           </select>
         </label>
-        <label>Endpoint
-          <input type="text" value={endpoint} onChange={e => setEndpoint(e.target.value)} />
+        <label className="block text-sm">
+          Endpoint
+          <input
+            type="text"
+            className="mt-1 w-full border rounded px-2 py-1"
+            value={endpoint}
+            onChange={e => setEndpoint(e.target.value)}
+          />
         </label>
-        <label>Max Tokens
-          <input type="number" value={maxTokens} onChange={e => setMaxTokens(parseInt(e.target.value))} />
+        <label className="block text-sm">
+          Max Tokens
+          <input
+            type="number"
+            className="mt-1 w-full border rounded px-2 py-1"
+            value={maxTokens}
+            onChange={e => setMaxTokens(parseInt(e.target.value))}
+          />
         </label>
-        <div style={{ marginTop: 10 }}>
-          <button onClick={() => { manager.update({ apiKey, model, endpoint, maxTokens }); onClose(); }}>Save</button>
-          <button onClick={onClose} style={{ marginLeft: 10 }}>Cancel</button>
+        <div className="flex justify-end space-x-2 pt-2">
+          <button
+            className="bg-gray-200 px-3 py-1 rounded"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            className="bg-blue-600 text-white px-3 py-1 rounded"
+            onClick={() => {
+              manager.update({ apiKey, model, endpoint, maxTokens });
+              onClose();
+            }}
+          >
+            Save
+          </button>
         </div>
       </div>
     </div>
   );
 }
-
