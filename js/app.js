@@ -16,8 +16,11 @@ class EmbeddingExplorerApp {
         // Initialize modules in dependency order
         this.dataManager = new DataManager();
         this.settingsManager = new SettingsManager();
-        this.uiManager = new UIManager(this.dataManager, this.settingsManager);
-        this.analysisManager = new AnalysisManager(this.dataManager, this.settingsManager, this.uiManager);
+        this.analysisManager = new AnalysisManager(this.dataManager, this.settingsManager);
+        this.uiManager = new UIManager(this.dataManager, this.settingsManager, this.analysisManager);
+        
+        // Set up circular dependency
+        this.analysisManager.setUIManager(this.uiManager);
         this.visualizationManager = new VisualizationManager(this.dataManager);
         
         // Setup inter-module communication

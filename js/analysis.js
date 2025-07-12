@@ -1,8 +1,12 @@
 // Analysis management module
 export class AnalysisManager {
-    constructor(dataManager, settingsManager, uiManager) {
+    constructor(dataManager, settingsManager) {
         this.dataManager = dataManager;
         this.settingsManager = settingsManager;
+        this.uiManager = null; // Will be set later to avoid circular dependency
+    }
+    
+    setUIManager(uiManager) {
         this.uiManager = uiManager;
     }
     

@@ -15,8 +15,8 @@
             <div class="visualization-header">
                 <div class="header-controls">
                     <div class="control-group">
-                        <button class="tool-btn active" data-mode="lasso" onclick="setSelectionMode('lasso')" title="Lasso Selection (Shift+L)" aria-label="Lasso selection mode">○</button>
-                        <button class="tool-btn" data-mode="box" onclick="setSelectionMode('box')" title="Box Selection (Shift+B)" aria-label="Box selection mode">□</button>
+                        <button class="tool-btn active" id="polygonBtn" data-mode="lasso" onclick="setSelectionMode('lasso')" title="Lasso Selection (Shift+L)" aria-label="Lasso selection mode">○</button>
+                        <button class="tool-btn" id="selectBtn" data-mode="box" onclick="setSelectionMode('box')" title="Box Selection (Shift+B)" aria-label="Box selection mode">□</button>
                         <button class="tool-btn" id="clearBtn" onclick="clearSelection()" title="Clear Selection (Shift+C)" aria-label="Clear selection">✕</button>
                     </div>
                     <div class="zoom-controls">

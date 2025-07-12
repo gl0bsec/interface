@@ -534,7 +534,6 @@ export class D3VisualizationManager {
     resetCursor() {
         // Reset cursor on the main plot area
         this.svg.select('.plot-background').style('cursor', 'default');
-        this.container.style('cursor', 'default');
     }
     
     updateStats() {
