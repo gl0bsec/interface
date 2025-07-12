@@ -102,6 +102,7 @@ body {
     padding: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     backdrop-filter: blur(10px);
+    pointer-events: none;
     z-index: 1000;
     max-width: 300px;
 }
@@ -1254,7 +1255,7 @@ textarea:focus-visible {
 
 /* Lasso Selection Styles */
 .polygon-selection {
-    pointer-events: none;
+    /* Allow clicks on vertices to complete the selection */
 }
 
 .polygon-path {
