@@ -354,8 +354,9 @@ export default function EmbeddingsExplorer() {
   const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null)
   
   // Data state
-  const [currentData, setCurrentData] = useState<EmbeddingPoint[]>(sampleData)
+  const [currentData, setCurrentData] = useState<EmbeddingPoint[]>([])
   const [isDataImported, setIsDataImported] = useState(false)
+  const [isLoadingTestData, setIsLoadingTestData] = useState(true)
   
   // Settings and modals
   const [settings, setSettings] = useState<AppSettings>(loadSettings())
@@ -452,7 +453,8 @@ export default function EmbeddingsExplorer() {
     return currentData.map(point => ({
       ...point,
       x: padding + ((point.x - minX) * xScale),
-      y: padding + ((point.y - minY) * yScale)
+      // Flip Y axis to match typical coordinate system (origin at bottom-left)
+      y: 500 - padding - ((point.y - minY) * yScale)
     }))
   }, [currentData])
 
@@ -782,6 +784,64 @@ export default function EmbeddingsExplorer() {
     return estimateCost(estimatedTokens, settings.llm.model)
   }, [estimatedTokens, settings.llm.model])
 
+  // Auto-load test data on component mount
+  useEffect(() => {
+    const loadTestData = async () => {
+      try {
+        setIsLoadingTestData(true)
+        console.log('Attempting to load test-data.csv...')
+        
+        const response = await fetch('/test-data.csv')
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        
+        const csvText = await response.text()
+        console.log('CSV loaded, size:', csvText.length, 'characters')
+        
+        const parsedCSV = parseCSV(csvText)
+        console.log('CSV parsed:', parsedCSV.headers.length, 'columns,', parsedCSV.rows.length, 'rows')
+        
+        // Auto-detect x, y, and text columns
+        const numericCols = detectNumericColumns(parsedCSV)
+        const xCol = numericCols.find(col => col.toLowerCase().includes('x')) || numericCols[0] || 'x'
+        const yCol = numericCols.find(col => col.toLowerCase().includes('y')) || numericCols[1] || 'y'
+        const textCol = parsedCSV.headers.find(h => 
+          h.toLowerCase().includes('text') || 
+          h.toLowerCase().includes('content') || 
+          h.toLowerCase().includes('original_text')
+        ) || parsedCSV.headers[0]
+        
+        console.log('Auto-detected columns - X:', xCol, 'Y:', yCol, 'Text:', textCol)
+        
+        const convertedData = convertCSVToEmbeddings(parsedCSV, xCol, yCol, textCol)
+        console.log('Converted to embeddings:', convertedData.length, 'points')
+        
+        setCurrentData(convertedData)
+        setIsDataImported(true)
+        
+        toast({
+          title: "Test data loaded",
+          description: `Loaded ${convertedData.length} data points from test-data.csv`,
+        })
+        
+      } catch (error) {
+        console.warn('Could not load test-data.csv, falling back to sample data:', error)
+        setCurrentData(sampleData)
+        setIsDataImported(false)
+        
+        toast({
+          title: "Using sample data",
+          description: "test-data.csv not found, loaded sample dataset instead",
+        })
+      } finally {
+        setIsLoadingTestData(false)
+      }
+    }
+
+    loadTestData()
+  }, [])
+
   // Export functions
   const handleExportAll = () => {
     downloadCSV(currentData, `embeddings-export-${new Date().toISOString().split('T')[0]}.csv`)
@@ -1020,6 +1080,12 @@ export default function EmbeddingsExplorer() {
                 <CardTitle className="text-sm">Dataset Statistics</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                {isLoadingTestData && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                    <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                    Loading test data...
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <div className="text-muted-foreground">Total Points</div>
@@ -1036,6 +1102,13 @@ export default function EmbeddingsExplorer() {
                   <div>
                     <div className="text-muted-foreground">Sources</div>
                     <div className="font-semibold">{Array.from(new Set(currentData.map((p) => p.source))).length}</div>
+                  </div>
+                </div>
+                <div className="pt-2 border-t">
+                  <div className="text-xs text-muted-foreground">
+                    Data Source: <span className="font-medium">
+                      {isDataImported ? "test-data.csv" : "Sample Dataset"}
+                    </span>
                   </div>
                 </div>
               </CardContent>
