@@ -32,20 +32,27 @@ export class DataManager {
 
     async loadCSVFile(file) {
         const text = await file.text();
-        const rows = d3.csvParse(text);
+        const rows = d3.csvParse(text.trim());
 
         if (!rows.columns.includes('x') || !rows.columns.includes('y')) {
             throw new Error('CSV must contain x and y columns');
         }
 
         const hasCategory = rows.columns.includes('category');
-        this.embeddings = rows.map((row, i) => ({
-            ...row,
-            x: parseFloat(row.x),
-            y: parseFloat(row.y),
-            category: hasCategory ? row.category : 'Default',
-            index: i
-        }));
+        this.embeddings = rows.map((row, i) => {
+            const x = parseFloat(row.x);
+            const y = parseFloat(row.y);
+            if (isNaN(x) || isNaN(y)) {
+                throw new Error(`Invalid numeric values in row ${i + 2}: x="${row.x}", y="${row.y}"`);
+            }
+            return {
+                ...row,
+                x,
+                y,
+                category: hasCategory ? row.category : 'Default',
+                index: i
+            };
+        });
 
         this.availableFields = this.extractAvailableFields();
         this.categories = this.getUniqueCategories();
