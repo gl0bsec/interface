@@ -1,0 +1,6 @@
+text,x,y,category,confidence,sentiment,source,custom_field
+"Machine learning is transforming industries",45.2,78.1,"Technology",0.92,0.3,"research","AI"
+"Climate change requires urgent action",12.8,65.4,"Environment",0.87,-0.5,"news","Global"
+"Cooking with fresh ingredients is rewarding",89.3,23.7,"Lifestyle",0.75,0.8,"blog","Food"
+"Exercise improves mental health significantly",34.6,91.2,"Health",0.94,0.6,"study","Wellness"
+"Financial planning ensures future security",67.9,44.8,"Finance",0.82,0.1,"guide","Money"
