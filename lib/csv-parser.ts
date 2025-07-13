@@ -1,10 +1,14 @@
 import type { CSVData, ImportedDataPoint, EmbeddingPoint } from "@/types/embedding"
 
 export function parseCSV(csvText: string): CSVData {
-  const lines = csvText.trim().split('\n')
+  // Normalize line endings and split into rows
+  const lines = csvText
+    .trim()
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0)
   
   // Parse headers
-  const headers = parseCSVLine(lines[0])
+  const headers = parseCSVLine(lines[0]).map(h => h.trim())
   
   // Parse data rows
   const rows = lines.slice(1).map(line => parseCSVLine(line))
@@ -13,6 +17,8 @@ export function parseCSV(csvText: string): CSVData {
 }
 
 function parseCSVLine(line: string): string[] {
+  // Remove any trailing carriage return characters
+  line = line.replace(/\r$/, '')
   const values: string[] = []
   let current = ''
   let inQuotes = false
