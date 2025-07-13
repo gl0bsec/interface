@@ -1,4 +1,4 @@
-import type { AppSettings, LLMSettings } from "@/types/embedding"
+import type { AppSettings } from "@/types/embedding"
 
 const DEFAULT_SETTINGS: AppSettings = {
   llm: {
@@ -41,8 +41,12 @@ export function getModelPrice(model: string): number {
     'gpt-3.5-turbo': 0.002,
     'gpt-4': 0.03,
     'gpt-4-turbo-preview': 0.01,
+    'gpt-4-turbo': 0.01,
     'gpt-4o': 0.005,
+    'gpt-4o-mini': 0.0015,
+    'claude-3-haiku': 0.00025,
     'claude-3-sonnet': 0.003,
+    'claude-3-5-sonnet': 0.003,
     'claude-3-opus': 0.015
   }
   

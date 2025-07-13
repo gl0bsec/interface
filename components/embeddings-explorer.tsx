@@ -12,7 +12,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Slider } from "@/components/ui/slider"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Search,
   X,
@@ -25,12 +27,19 @@ import {
   Settings,
   GripVertical,
   Eye,
-  BarChart3,
   FileText,
   AlertCircle,
   CheckCircle,
   Loader2,
   ChevronDown,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Move,
+  MousePointer,
+  Pentagon,
+  MessageSquare,
+  Database,
 } from "lucide-react"
 
 import type { 
@@ -38,13 +47,14 @@ import type {
   ColorOption, 
   SearchCondition, 
   ParsedQuery,
-  LegendItem,
   TooltipPosition,
   AppSettings,
   CSVData
 } from "@/types/embedding"
 import { loadSettings, saveSettings, estimateTokens, estimateCost } from "@/lib/settings"
-import { parseCSV, convertCSVToEmbeddings, detectNumericColumns, downloadCSV } from "@/lib/csv-parser"
+import { parseCSV, convertCSVToEmbeddingsOptimized, parseCSVStreaming, detectNumericColumns, downloadCSV } from "@/lib/csv-parser"
+import { clusterPoints, getClusterSize, getClusterColor } from "@/lib/point-clustering"
+import { VirtualizedSelectedPoints } from "@/components/virtualized-selected-points"
 import { sendToLLM, type LLMResponse } from "@/lib/llm-api"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
@@ -305,7 +315,7 @@ const parseSearchQuery = (query: string): ParsedQuery => {
     }
 
     return { conditions, operator, isValid: true }
-  } catch (error) {
+  } catch {
     return { conditions: [], operator: "AND", isValid: false, error: "Invalid search syntax" }
   }
 }
@@ -353,10 +363,26 @@ export default function EmbeddingsExplorer() {
   const [rightSidebarWidth, setRightSidebarWidth] = useState(380)
   const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null)
   
+  // Zoom and point size state
+  const [zoomLevel, setZoomLevel] = useState(1)
+  const [pointSize, setPointSize] = useState([7])
+  
+  // Interaction mode and pan state
+  const [interactionMode, setInteractionMode] = useState<'select' | 'pan' | 'polygon'>('select')
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 })
+  const [isPanning, setIsPanning] = useState(false)
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 })
+  
+  // Polygon selection state
+  const [polygonPoints, setPolygonPoints] = useState<Array<{ x: number, y: number }>>([])
+  const [isDrawingPolygon, setIsDrawingPolygon] = useState(false)
+  
   // Data state
   const [currentData, setCurrentData] = useState<EmbeddingPoint[]>([])
   const [isDataImported, setIsDataImported] = useState(false)
   const [isLoadingTestData, setIsLoadingTestData] = useState(true)
+  const [importProgress, setImportProgress] = useState(0)
+  const [isProcessingLargeFile, setIsProcessingLargeFile] = useState(false)
   
   // Settings and modals
   const [settings, setSettings] = useState<AppSettings>(loadSettings())
@@ -374,9 +400,14 @@ export default function EmbeddingsExplorer() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<LLMResponse | null>(null)
   const [showAnalysisResult, setShowAnalysisResult] = useState(false)
+  
+  // Tab state for right sidebar
+  const [rightSidebarTab, setRightSidebarTab] = useState("data")
 
   const leftResizeRef = useRef<HTMLDivElement>(null)
   const rightResizeRef = useRef<HTMLDivElement>(null)
+  const dataTabRef = useRef<HTMLDivElement>(null)
+  const [dataTabHeight, setDataTabHeight] = useState(500)
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(currentData.map((point) => point.category)))
@@ -400,7 +431,7 @@ export default function EmbeddingsExplorer() {
       if (['id', 'text', 'x', 'y', 'timestamp'].includes(key)) return
 
       // Check if this field is mostly numerical or categorical
-      const values = currentData.slice(0, 50).map(point => (point as any)[key]).filter(v => v !== undefined && v !== null && v !== '')
+      const values = currentData.slice(0, 50).map(point => (point as Record<string, unknown>)[key]).filter(v => v !== undefined && v !== null && v !== '')
       
       if (values.length === 0) return
 
@@ -427,39 +458,85 @@ export default function EmbeddingsExplorer() {
 
   const parsedQuery = useMemo(() => parseSearchQuery(searchQuery), [searchQuery])
 
-  // Scale coordinates to fit the viewport (500x500)
+  // Optimized scaling with better memoization and bounds caching
+  const dataBounds = useMemo(() => {
+    if (currentData.length === 0) return null
+    
+    const xValues = []
+    const yValues = []
+    
+    for (let i = 0; i < currentData.length; i++) {
+      const point = currentData[i]
+      if (typeof point.x === 'number' && !isNaN(point.x)) xValues.push(point.x)
+      if (typeof point.y === 'number' && !isNaN(point.y)) yValues.push(point.y)
+    }
+    
+    if (xValues.length === 0 || yValues.length === 0) return null
+    
+    return {
+      minX: Math.min(...xValues),
+      maxX: Math.max(...xValues),
+      minY: Math.min(...yValues),
+      maxY: Math.max(...yValues)
+    }
+  }, [currentData])
+  
   const scaledData = useMemo(() => {
-    if (currentData.length === 0) return []
+    if (!dataBounds || currentData.length === 0) return []
     
-    // Find data bounds
-    const xValues = currentData.map(p => p.x)
-    const yValues = currentData.map(p => p.y)
-    const minX = Math.min(...xValues)
-    const maxX = Math.max(...xValues)
-    const minY = Math.min(...yValues)
-    const maxY = Math.max(...yValues)
+    const { minX, maxX, minY, maxY } = dataBounds
+    const padding = 50
+    const viewportWidth = 400 // 500 - 2*padding
+    const viewportHeight = 400
     
-    // Add padding (10% on each side)
-    const padding = 50 // 10% of 500
-    const viewportWidth = 500 - (padding * 2)
-    const viewportHeight = 500 - (padding * 2)
-    
-    // Calculate scale factors
     const xRange = maxX - minX
     const yRange = maxY - minY
-    const xScale = xRange > 0 ? viewportWidth / xRange : 1
-    const yScale = yRange > 0 ? viewportHeight / yRange : 1
+    const baseXScale = xRange > 0 ? viewportWidth / xRange : 1
+    const baseYScale = yRange > 0 ? viewportHeight / yRange : 1
     
-    return currentData.map(point => ({
-      ...point,
-      x: padding + ((point.x - minX) * xScale),
-      // Flip Y axis to match typical coordinate system (origin at bottom-left)
-      y: 500 - padding - ((point.y - minY) * yScale)
-    }))
-  }, [currentData])
+    const centerX = 250
+    const centerY = 250
+    
+    // Pre-allocate result array for better performance
+    const scaled = new Array(currentData.length)
+    
+    for (let i = 0; i < currentData.length; i++) {
+      const point = currentData[i]
+      const baseScaledX = padding + ((point.x - minX) * baseXScale)
+      const baseScaledY = 500 - padding - ((point.y - minY) * baseYScale)
+      
+      const scaledX = centerX + (baseScaledX - centerX) * zoomLevel + panOffset.x
+      const scaledY = centerY + (baseScaledY - centerY) * zoomLevel + panOffset.y
+      
+      scaled[i] = {
+        ...point,
+        x: scaledX,
+        y: scaledY
+      }
+    }
+    
+    return scaled
+  }, [currentData, dataBounds, zoomLevel, panOffset])
+  
+  // Apply clustering for performance at low zoom levels
+  const clusteredData = useMemo(() => {
+    return clusterPoints(scaledData, zoomLevel)
+  }, [scaledData, zoomLevel])
 
   const filteredData = useMemo(() => {
-    return scaledData.filter((point) => {
+    // Use clustered data for better performance
+    const dataToFilter = clusteredData.map(cluster => {
+      // For clusters, use the first point for filtering logic
+      const point = cluster.count === 1 ? cluster.points[0] : {
+        ...cluster.points[0], // Use first point as representative
+        x: cluster.x,
+        y: cluster.y,
+        id: cluster.id
+      }
+      return point
+    })
+    
+    return dataToFilter.filter((point) => {
       const matchesCategory = selectedCategory === "all" || point.category === selectedCategory
 
       if (!parsedQuery.isValid || parsedQuery.conditions.length === 0) {
@@ -474,7 +551,7 @@ export default function EmbeddingsExplorer() {
 
       return matchesCategory && searchMatches
     })
-  }, [searchQuery, selectedCategory, parsedQuery, scaledData])
+  }, [searchQuery, selectedCategory, parsedQuery, clusteredData])
 
   // Resize handlers
   const handleMouseDown = useCallback((side: "left" | "right") => {
@@ -500,6 +577,114 @@ export default function EmbeddingsExplorer() {
     setIsResizing(null)
   }, [])
 
+  // Zoom control functions
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel(prev => Math.min(prev * 1.2, 5))
+  }, [])
+
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel(prev => Math.max(prev / 1.2, 0.2))
+  }, [])
+
+  const handleZoomReset = useCallback(() => {
+    setZoomLevel(1)
+    setPanOffset({ x: 0, y: 0 })
+  }, [])
+
+  // Interaction mode handlers
+  const setSelectMode = useCallback(() => {
+    setInteractionMode('select')
+    setPolygonPoints([])
+    setIsDrawingPolygon(false)
+  }, [])
+
+  const setPanMode = useCallback(() => {
+    setInteractionMode('pan')
+    setPolygonPoints([])
+    setIsDrawingPolygon(false)
+  }, [])
+
+  const setPolygonMode = useCallback(() => {
+    setInteractionMode('polygon')
+    setPolygonPoints([])
+    setIsDrawingPolygon(true)
+  }, [])
+
+  // Pan handlers
+  const handlePanStart = useCallback((e: React.MouseEvent) => {
+    if (interactionMode === 'pan') {
+      setIsPanning(true)
+      setPanStart({ x: e.clientX, y: e.clientY })
+    }
+  }, [interactionMode])
+
+  const handlePanMove = useCallback((e: React.MouseEvent) => {
+    if (isPanning && interactionMode === 'pan') {
+      const deltaX = e.clientX - panStart.x
+      const deltaY = e.clientY - panStart.y
+      setPanOffset(prev => ({
+        x: prev.x + deltaX,
+        y: prev.y + deltaY
+      }))
+      setPanStart({ x: e.clientX, y: e.clientY })
+    }
+  }, [isPanning, interactionMode, panStart])
+
+  const handlePanEnd = useCallback(() => {
+    setIsPanning(false)
+  }, [])
+
+  // Point-in-polygon detection using ray casting algorithm
+  const isPointInPolygon = useCallback((point: { x: number, y: number }, polygon: Array<{ x: number, y: number }>) => {
+    if (polygon.length < 3) return false
+    
+    let inside = false
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      if (((polygon[i].y > point.y) !== (polygon[j].y > point.y)) &&
+          (point.x < (polygon[j].x - polygon[i].x) * (point.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x)) {
+        inside = !inside
+      }
+    }
+    return inside
+  }, [])
+
+  // Polygon selection handlers
+  const handlePolygonClick = useCallback((e: React.MouseEvent) => {
+    if (interactionMode === 'polygon' && isDrawingPolygon) {
+      const svg = e.currentTarget.closest('svg')
+      if (!svg) return
+      
+      const rect = svg.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      
+      // Convert to SVG coordinates (scale to 500x500 viewBox)
+      const svgX = (x / rect.width) * 500
+      const svgY = (y / rect.height) * 500
+      
+      setPolygonPoints(prev => [...prev, { x: svgX, y: svgY }])
+    }
+  }, [interactionMode, isDrawingPolygon])
+
+  const finishPolygonSelection = useCallback(() => {
+    if (polygonPoints.length >= 3) {
+      // Select all points inside the polygon
+      const pointsInPolygon = filteredData.filter(point => 
+        isPointInPolygon({ x: point.x, y: point.y }, polygonPoints)
+      )
+      setSelectedPoints(pointsInPolygon)
+    }
+    setPolygonPoints([])
+    setIsDrawingPolygon(false)
+    setInteractionMode('select')
+  }, [polygonPoints, filteredData, isPointInPolygon])
+
+  const cancelPolygonSelection = useCallback(() => {
+    setPolygonPoints([])
+    setIsDrawingPolygon(false)
+    setInteractionMode('select')
+  }, [])
+
   // Add event listeners for resize
   useEffect(() => {
     document.addEventListener("mousemove", handleMouseMove)
@@ -510,32 +695,48 @@ export default function EmbeddingsExplorer() {
     }
   }, [handleMouseMove, handleMouseUp])
 
-  // Color coding logic
+  // Calculate available height for data tab
+  useEffect(() => {
+    const updateHeight = () => {
+      if (dataTabRef.current) {
+        const rect = dataTabRef.current.getBoundingClientRect()
+        const availableHeight = window.innerHeight - rect.top - 100 // Leave some margin
+        setDataTabHeight(Math.max(300, availableHeight))
+      }
+    }
+
+    updateHeight()
+    window.addEventListener('resize', updateHeight)
+    return () => window.removeEventListener('resize', updateHeight)
+  }, [rightSidebarTab])
+
+  // Enhanced color coding with Design Are.na gradient system
   const getPointColor = useCallback((point: EmbeddingPoint) => {
     const colorOption = colorOptions.find((opt) => opt.value === colorBy)
 
     if (colorOption?.type === "categorical") {
+      // Enhanced categorical colors using the gradient system
       const categoryColors: Record<string, string> = {
-        "AI/ML": "#3b82f6",
-        Cooking: "#f59e0b",
-        Environment: "#10b981",
-        Technology: "#8b5cf6",
-        Health: "#ef4444",
-        research_paper: "#dc2626",
-        textbook: "#ea580c",
-        recipe_book: "#ca8a04",
-        blog_post: "#65a30d",
-        magazine: "#059669",
-        news_article: "#0891b2",
-        report: "#0284c7",
-        scientific_journal: "#7c3aed",
-        tutorial: "#c026d3",
-        documentation: "#db2777",
-        medical_journal: "#be185d",
-        nutrition_guide: "#9f1239",
-        research_study: "#881337",
+        "AI/ML": "hsl(var(--vis-teal))",
+        Cooking: "hsl(var(--vis-yellow))",
+        Environment: "hsl(var(--vis-teal))",
+        Technology: "hsl(var(--vis-orange))",
+        Health: "hsl(var(--vis-red))",
+        research_paper: "hsl(var(--vis-teal))",
+        textbook: "hsl(178 64% 57%)",
+        recipe_book: "hsl(var(--vis-yellow))",
+        blog_post: "hsl(45 93% 68%)",
+        magazine: "hsl(var(--vis-orange))",
+        news_article: "hsl(178 54% 37%)",
+        report: "hsl(178 74% 57%)",
+        scientific_journal: "hsl(var(--vis-purple))",
+        tutorial: "hsl(25 85% 43%)",
+        documentation: "hsl(280 75% 62%)",
+        medical_journal: "hsl(var(--vis-red))",
+        nutrition_guide: "hsl(0 74% 50%)",
+        research_study: "hsl(280 55% 42%)",
       }
-      return categoryColors[point[colorBy as keyof EmbeddingPoint] as string] || "#6b7280"
+      return categoryColors[point[colorBy as keyof EmbeddingPoint] as string] || "hsl(215 16% 46.9%)"
     } else {
       const value = point[colorBy as keyof EmbeddingPoint] as number
       const allValues = currentData.map((p) => p[colorBy as keyof EmbeddingPoint] as number)
@@ -544,19 +745,31 @@ export default function EmbeddingsExplorer() {
       const normalized = (value - min) / (max - min)
 
       if (colorBy === "sentiment") {
+        // Enhanced sentiment mapping with gradient colors
         if (value < 0) {
-          const intensity = Math.abs(value)
-          return `rgb(${Math.round(220 * intensity + 100)}, ${Math.round(100 * (1 - intensity))}, ${Math.round(100 * (1 - intensity))})`
+          const intensity = Math.abs(normalized)
+          return `hsl(0 84% ${60 + intensity * 20}%)`
         } else {
-          return `rgb(${Math.round(100 * (1 - value))}, ${Math.round(180 * value + 100)}, ${Math.round(100 * (1 - value))})`
+          return `hsl(178 ${64 - normalized * 20}% ${47 + normalized * 20}%)`
         }
       } else {
-        const red = Math.round(255 * normalized)
-        const blue = Math.round(255 * (1 - normalized))
-        return `rgb(${red}, 100, ${blue})`
+        // Design Are.na inspired gradient mapping
+        if (normalized < 0.33) {
+          // Teal to Yellow
+          const t = normalized / 0.33
+          return `hsl(${178 - t * 133} ${64 + t * 29}% ${47 + t * 11}%)`
+        } else if (normalized < 0.66) {
+          // Yellow to Orange
+          const t = (normalized - 0.33) / 0.33
+          return `hsl(${45 - t * 20} ${93 + t * 2}% ${58 - t * 5}%)`
+        } else {
+          // Orange to Red
+          const t = (normalized - 0.66) / 0.34
+          return `hsl(${25 - t * 25} ${95 - t * 11}% ${53 + t * 7}%)`
+        }
       }
     }
-  }, [colorBy, currentData])
+  }, [colorBy, currentData, colorOptions])
 
   // Generate legend items
   const legendItems = useMemo(() => {
@@ -568,25 +781,31 @@ export default function EmbeddingsExplorer() {
       )
       return uniqueValues.map((value) => ({
         label: value,
-        color: getPointColor({ [colorBy]: value } as any),
+        color: getPointColor({ [colorBy]: value } as EmbeddingPoint),
       }))
     } else {
       const allValues = currentData.map((p) => p[colorBy as keyof EmbeddingPoint] as number)
       const min = Math.min(...allValues)
       const max = Math.max(...allValues)
       return [
-        { label: `Min: ${min.toFixed(2)}`, color: getPointColor({ [colorBy]: min } as any) },
-        { label: `Max: ${max.toFixed(2)}`, color: getPointColor({ [colorBy]: max } as any) },
+        { label: `Min: ${min.toFixed(2)}`, color: getPointColor({ [colorBy]: min } as EmbeddingPoint) },
+        { label: `Max: ${max.toFixed(2)}`, color: getPointColor({ [colorBy]: max } as EmbeddingPoint) },
       ]
     }
-  }, [colorBy, currentData])
+  }, [colorBy, currentData, getPointColor, colorOptions])
 
-  const handlePointClick = (point: EmbeddingPoint) => {
-    const isSelected = selectedPoints.some((p) => p.id === point.id)
-    if (isSelected) {
-      setSelectedPoints(selectedPoints.filter((p) => p.id !== point.id))
-    } else {
-      setSelectedPoints([...selectedPoints, point])
+  const handlePointClick = (point: EmbeddingPoint, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation() // Prevent triggering polygon click
+    }
+    
+    if (interactionMode === 'select') {
+      const isSelected = selectedPoints.some((p) => p.id === point.id)
+      if (isSelected) {
+        setSelectedPoints(selectedPoints.filter((p) => p.id !== point.id))
+      } else {
+        setSelectedPoints([...selectedPoints, point])
+      }
     }
   }
 
@@ -644,11 +863,24 @@ export default function EmbeddingsExplorer() {
       return
     }
 
+    // Check if file is large (> 5MB) and use streaming
+    const isLargeFile = file.size > 5 * 1024 * 1024
+    
     try {
       console.log('Reading file...')
+      
+      if (isLargeFile) {
+        setIsProcessingLargeFile(true)
+        setImportProgress(0)
+        
+        toast({
+          title: "Processing large file",
+          description: "This may take a moment...",
+        })
+      }
+      
       const text = await file.text()
       console.log('File content length:', text.length)
-      console.log('First 200 characters:', text.substring(0, 200))
       
       const parsedCSV = parseCSV(text)
       console.log('Parsed CSV:', parsedCSV.headers, 'Rows:', parsedCSV.rows.length)
@@ -675,7 +907,8 @@ export default function EmbeddingsExplorer() {
       const textCols = parsedCSV.headers.filter(h => 
         h.toLowerCase().includes('text') || 
         h.toLowerCase().includes('content') || 
-        h.toLowerCase().includes('description')
+        h.toLowerCase().includes('description') ||
+        h.toLowerCase().includes('original_text')
       )
       if (textCols.length > 0) {
         setSelectedTextColumn(textCols[0])
@@ -697,20 +930,44 @@ export default function EmbeddingsExplorer() {
         description: `Failed to parse CSV file: ${errorMessage}`,
         variant: "destructive"
       })
+    } finally {
+      setIsProcessingLargeFile(false)
+      setImportProgress(0)
     }
     
     // Reset file input
     event.target.value = ''
   }
 
-  const handleImportData = () => {
+  const handleImportData = async () => {
     if (!csvData || !selectedXColumn || !selectedYColumn) {
       setImportError('Please select X and Y columns')
       return
     }
 
+    const isLargeDataset = csvData.rows.length > 10000
+
     try {
-      const newData = convertCSVToEmbeddings(csvData, selectedXColumn, selectedYColumn, selectedTextColumn)
+      setIsProcessingLargeFile(isLargeDataset)
+      setImportProgress(0)
+
+      let newData: EmbeddingPoint[]
+
+      if (isLargeDataset) {
+        // Use streaming for large datasets
+        const csvText = [csvData.headers.join(','), ...csvData.rows.map(row => row.join(','))].join('\n')
+        
+        newData = await parseCSVStreaming(csvText, selectedXColumn, selectedYColumn, selectedTextColumn, {
+          chunkSize: 1000,
+          onProgress: (processed, total) => {
+            setImportProgress(Math.round((processed / total) * 100))
+          }
+        })
+      } else {
+        // Use optimized conversion for smaller datasets
+        newData = convertCSVToEmbeddingsOptimized(csvData, selectedXColumn, selectedYColumn, selectedTextColumn)
+      }
+
       setCurrentData(newData)
       setIsDataImported(true)
       setShowImportDialog(false)
@@ -723,13 +980,24 @@ export default function EmbeddingsExplorer() {
         description: `Imported ${newData.length} data points. You can now visualize and analyze your data.`,
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Import failed'
+      let errorMessage = 'Import failed'
+      if (error instanceof Error) {
+        errorMessage = error.message
+        // Provide more helpful error messages
+        if (errorMessage.includes('Required columns not found')) {
+          errorMessage = `Could not find required x and y columns. Available columns: ${csvData?.headers.join(', ') || 'none'}`
+        }
+      }
+      console.error('CSV import error:', error)
       setImportError(errorMessage)
       toast({
         title: "Import failed",
         description: errorMessage,
         variant: "destructive"
       })
+    } finally {
+      setIsProcessingLargeFile(false)
+      setImportProgress(0)
     }
   }
 
@@ -746,9 +1014,30 @@ export default function EmbeddingsExplorer() {
 
   // Analysis functions
   const handleAnalyze = async () => {
-    if (!prompt.trim() || selectedPoints.length === 0) return
+    if (!prompt.trim()) {
+      toast({
+        title: "Prompt required",
+        description: "Please enter a prompt for analysis.",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    if (selectedPoints.length === 0) {
+      toast({
+        title: "No data selected",
+        description: "Please select some data points to analyze.",
+        variant: "destructive"
+      })
+      return
+    }
+    
     if (!settings.llm.apiKey) {
-      alert('Please configure your API key in settings first.')
+      toast({
+        title: "API key required",
+        description: "Please configure your API key in settings first.",
+        variant: "destructive"
+      })
       setShowSettings(true)
       return
     }
@@ -758,20 +1047,35 @@ export default function EmbeddingsExplorer() {
       const result = await sendToLLM(prompt, selectedPoints, settings.llm, settings.apiFields)
       setAnalysisResult(result)
       setShowAnalysisResult(true)
+      
+      if (result.success) {
+        toast({
+          title: "Analysis completed",
+          description: `Used ${result.tokensUsed || 0} tokens • Cost: $${result.cost?.toFixed(4) || '0.0000'}`,
+        })
+      }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Analysis failed'
       setAnalysisResult({
         success: false,
-        error: error instanceof Error ? error.message : 'Analysis failed'
+        error: errorMessage
       })
       setShowAnalysisResult(true)
+      
+      toast({
+        title: "Analysis failed",
+        description: errorMessage,
+        variant: "destructive"
+      })
+    } finally {
+      setIsAnalyzing(false)
     }
-    setIsAnalyzing(false)
   }
 
   const estimatedTokens = useMemo(() => {
     if (!prompt || selectedPoints.length === 0) return 0
     const dataText = JSON.stringify(selectedPoints.map(p => {
-      const filtered: any = {}
+      const filtered: Record<string, unknown> = {}
       settings.apiFields.forEach(field => {
         if (field in p) filtered[field] = p[field as keyof EmbeddingPoint]
       })
@@ -814,7 +1118,7 @@ export default function EmbeddingsExplorer() {
         
         console.log('Auto-detected columns - X:', xCol, 'Y:', yCol, 'Text:', textCol)
         
-        const convertedData = convertCSVToEmbeddings(parsedCSV, xCol, yCol, textCol)
+        const convertedData = convertCSVToEmbeddingsOptimized(parsedCSV, xCol, yCol, textCol)
         console.log('Converted to embeddings:', convertedData.length, 'points')
         
         setCurrentData(convertedData)
@@ -876,45 +1180,36 @@ export default function EmbeddingsExplorer() {
   }
 
   return (
-    <div className="h-screen bg-background flex flex-col">
+    <div className="h-screen paper-texture flex flex-col">
       {/* Enhanced Top Navigation */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
-        <div className="flex h-16 items-center px-6 gap-6">
-          {/* Logo/Title */}
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-white" />
-            </div>
-            <h1 className="text-xl font-semibold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-              Embeddings Explorer
-            </h1>
-          </div>
+        <div className="flex h-12 items-center px-4 gap-4">
 
           {/* Search Bar */}
           <div className="flex-1 max-w-2xl relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground w-3 h-3" />
             <Input
               placeholder="Search embeddings or use boolean queries (e.g., category:AI/ML AND confidence:>0.9)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`pl-10 pr-10 ${!parsedQuery.isValid ? "border-red-500" : ""}`}
+              className={`pl-8 pr-8 h-8 text-xs technical-hover transition-all duration-200 ${!parsedQuery.isValid ? "border-red-500" : ""}`}
             />
             <Collapsible open={showSearchHelp} onOpenChange={setShowSearchHelp}>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="absolute right-1 top-1/2 transform -translate-y-1/2">
-                  <HelpCircle className="w-4 h-4" />
+                <Button variant="ghost" size="sm" className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0">
+                  <HelpCircle className="w-3 h-3" />
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="absolute top-full left-0 right-0 mt-2 z-50">
                 <Card className="shadow-lg">
-                  <CardContent className="p-4">
-                    <div className="text-sm space-y-2">
+                  <CardContent className="p-3">
+                    <div className="text-xs space-y-1">
                       <p className="font-medium">Boolean Search Examples:</p>
                       {exampleQueries.map((query, index) => (
                         <button
                           key={index}
                           onClick={() => setSearchQuery(query)}
-                          className="block w-full text-left p-2 hover:bg-muted rounded text-xs font-mono bg-muted/50"
+                          className="block w-full text-left p-1.5 hover:bg-muted rounded text-xs font-mono-technical bg-muted/50 technical-hover transition-all duration-150"
                         >
                           {query}
                         </button>
@@ -925,16 +1220,16 @@ export default function EmbeddingsExplorer() {
               </CollapsibleContent>
             </Collapsible>
             {!parsedQuery.isValid && (
-              <p className="absolute top-full left-0 text-xs text-red-500 mt-1">{parsedQuery.error}</p>
+              <p className="absolute top-full left-0 text-xs text-red-500 mt-0.5">{parsedQuery.error}</p>
             )}
           </div>
 
           {/* Filters */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-40">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Category" />
+              <SelectTrigger className="w-32 h-8 text-xs technical-hover">
+                <Filter className="w-3 h-3 mr-1" />
+                <SelectValue placeholder="Category" className="font-mono-technical" />
               </SelectTrigger>
               <SelectContent>
                 {categories.map((category) => (
@@ -946,9 +1241,9 @@ export default function EmbeddingsExplorer() {
             </Select>
 
             <Select value={colorBy} onValueChange={setColorBy}>
-              <SelectTrigger className="w-40">
-                <Palette className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Color by..." />
+              <SelectTrigger className="w-32 h-8 text-xs technical-hover">
+                <Palette className="w-3 h-3 mr-1" />
+                <SelectValue placeholder="Color by..." className="font-mono-technical" />
               </SelectTrigger>
               <SelectContent>
                 {colorOptions.map((option) => (
@@ -961,13 +1256,13 @@ export default function EmbeddingsExplorer() {
           </div>
 
           {/* Stats & Actions */}
-          <div className="flex items-center gap-4">
-            <div className="text-sm text-muted-foreground">
+          <div className="flex items-center gap-3">
+            <div className="text-technical bg-coordinates rounded px-2 py-1 text-xs">
               <span className="font-medium">{filteredData.length}</span> points •{" "}
               <span className="font-medium">{selectedPoints.length}</span> selected
             </div>
-            <Separator orientation="vertical" className="h-6" />
-            <div className="flex items-center gap-2">
+            <Separator orientation="vertical" className="h-4" />
+            <div className="flex items-center gap-1.5">
               <div className="relative">
                 <input
                   type="file"
@@ -980,49 +1275,50 @@ export default function EmbeddingsExplorer() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="relative"
+                  className="relative technical-hover h-7 px-2 text-xs"
                   onClick={triggerFileInput}
                 >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Import CSV
+                  <Upload className="w-3 h-3 mr-1" />
+                  <span className="font-mono-technical">IMPORT</span>
                 </Button>
               </div>
               {isDataImported && (
-                <Button variant="outline" size="sm" onClick={resetToSampleData}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Sample Data
+                <Button variant="outline" size="sm" onClick={resetToSampleData} className="technical-hover h-7 px-2 text-xs">
+                  <FileText className="w-3 h-3 mr-1" />
+                  <span className="font-mono-technical">SAMPLE</span>
                 </Button>
               )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export
-                    <ChevronDown className="w-4 h-4 ml-2" />
+                  <Button variant="outline" size="sm" className="technical-hover h-7 px-2 text-xs">
+                    <Download className="w-3 h-3 mr-1" />
+                    <span className="font-mono-technical">EXPORT</span>
+                    <ChevronDown className="w-3 h-3 ml-1" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleExportAll}>
-                    <Download className="w-4 h-4 mr-2" />
-                    Export All Data ({currentData.length} points)
+                  <DropdownMenuItem onClick={handleExportAll} className="font-mono-technical text-xs">
+                    <Download className="w-3 h-3 mr-1" />
+                    ALL_DATA [{currentData.length}]
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportFiltered}>
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Filtered ({filteredData.length} points)
+                  <DropdownMenuItem onClick={handleExportFiltered} className="font-mono-technical text-xs">
+                    <Download className="w-3 h-3 mr-1" />
+                    FILTERED [{filteredData.length}]
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     onClick={handleExportSelected}
                     disabled={selectedPoints.length === 0}
+                    className="font-mono-technical text-xs"
                   >
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Selected ({selectedPoints.length} points)
+                    <Download className="w-3 h-3 mr-1" />
+                    SELECTED [{selectedPoints.length}]
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button variant="outline" size="sm" onClick={() => setShowSettings(true)}>
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
+              <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="technical-hover h-7 px-2 text-xs">
+                <Settings className="w-3 h-3 mr-1" />
+                <span className="font-mono-technical">SETTINGS</span>
               </Button>
             </div>
           </div>
@@ -1032,42 +1328,42 @@ export default function EmbeddingsExplorer() {
       {/* Main Content with Resizable Sidebars */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Legend & Analytics */}
-        <div className="border-r bg-muted/20 flex flex-col relative" style={{ width: leftSidebarWidth }}>
-          <div className="p-4 border-b">
-            <h3 className="font-semibold text-sm flex items-center gap-2">
-              <Eye className="w-4 h-4" />
-              Visualization Legend
+        <div className="border-r bg-sidebar-background flex flex-col relative" style={{ width: leftSidebarWidth }}>
+          <div className="p-3 border-b border-sidebar-border">
+            <h3 className="font-mono-technical text-xs font-medium tracking-wide flex items-center gap-1">
+              <Eye className="w-3 h-3" />
+              VISUALIZATION_LEGEND
             </h3>
           </div>
 
-          <div className="flex-1 overflow-auto p-4 space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">{colorOptions.find((opt) => opt.value === colorBy)?.label}</CardTitle>
+          <div className="flex-1 overflow-auto p-3 space-y-3">
+            <Card className="academic-card technical-hover">
+              <CardHeader className="pb-2">
+                <CardTitle className="font-mono-technical text-xs tracking-wide">{colorOptions.find((opt) => opt.value === colorBy)?.label}</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-1.5 p-3">
                 {legendItems.slice(0, 8).map((item, index) => (
-                  <div key={index} className="flex items-center gap-3">
+                  <div key={index} className="flex items-center gap-2">
                     <div
-                      className="w-4 h-4 rounded-full border-2 border-white shadow-sm"
+                      className="w-3 h-3 rounded-full border border-white shadow-sm"
                       style={{ backgroundColor: item.color }}
                     />
-                    <span className="text-sm truncate">{item.label}</span>
+                    <span className="text-xs truncate">{item.label}</span>
                   </div>
                 ))}
                 {legendItems.length > 8 && (
-                  <p className="text-xs text-muted-foreground">+{legendItems.length - 8} more</p>
+                  <p className="text-xs text-muted-foreground opacity-70">+{legendItems.length - 8} more</p>
                 )}
                 {colorOptions.find((opt) => opt.value === colorBy)?.type === "numerical" && (
-                  <div className="mt-4">
-                    <div className="text-xs text-muted-foreground mb-2">Scale:</div>
+                  <div className="mt-3">
+                    <div className="text-xs text-muted-foreground mb-1">Scale:</div>
                     <div
-                      className="h-3 rounded-full border"
+                      className="h-2 rounded-full border"
                       style={{
                         background:
                           colorBy === "sentiment"
-                            ? "linear-gradient(to right, #dc2626, #ffffff, #16a34a)"
-                            : "linear-gradient(to right, #3b82f6, #ef4444)",
+                            ? "linear-gradient(to right, hsl(var(--vis-red)), hsl(210 25% 95%), hsl(var(--vis-teal)))"
+                            : "linear-gradient(to right, hsl(var(--vis-teal)), hsl(var(--vis-yellow)), hsl(var(--vis-orange)), hsl(var(--vis-red)))",
                       }}
                     />
                   </div>
@@ -1075,40 +1371,76 @@ export default function EmbeddingsExplorer() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Dataset Statistics</CardTitle>
+            <Card className="academic-card technical-hover">
+              <CardHeader className="pb-2">
+                <CardTitle className="font-mono-technical text-xs tracking-wide">DATASET_STATISTICS</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {isLoadingTestData && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
-                    <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                    Loading test data...
+              <CardContent className="space-y-2 p-3">
+                {(isLoadingTestData || isProcessingLargeFile) && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+                    <div className="animate-spin h-3 w-3 border-2 border-primary border-t-transparent rounded-full"></div>
+                    <span className="font-mono-technical">
+                      {isLoadingTestData ? 'LOADING_DATA...' : `PROCESSING... ${importProgress}%`}
+                    </span>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                {isProcessingLargeFile && importProgress > 0 && (
+                  <div className="w-full bg-muted rounded-full h-1.5 mb-2">
+                    <div 
+                      className="bg-primary h-1.5 rounded-full transition-all duration-300" 
+                      style={{ width: `${importProgress}%` }}
+                    ></div>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <div className="text-muted-foreground">Total Points</div>
-                    <div className="font-semibold">{currentData.length}</div>
+                    <div className="text-muted-foreground text-xs uppercase tracking-wider">Total Points</div>
+                    <div className="text-technical text-sm">{currentData.length}</div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground">Filtered</div>
-                    <div className="font-semibold">{filteredData.length}</div>
+                    <div className="text-muted-foreground text-xs uppercase tracking-wider">Filtered</div>
+                    <div className="text-technical text-sm">{filteredData.length}</div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground">Categories</div>
-                    <div className="font-semibold">{categories.length - 1}</div>
+                    <div className="text-muted-foreground text-xs uppercase tracking-wider">Categories</div>
+                    <div className="text-technical text-sm">{categories.length - 1}</div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground">Sources</div>
-                    <div className="font-semibold">{Array.from(new Set(currentData.map((p) => p.source))).length}</div>
+                    <div className="text-muted-foreground text-xs uppercase tracking-wider">Sources</div>
+                    <div className="text-technical text-sm">{Array.from(new Set(currentData.map((p) => p.source))).length}</div>
                   </div>
                 </div>
-                <div className="pt-2 border-t">
+                <div className="pt-1.5 border-t">
                   <div className="text-xs text-muted-foreground">
-                    Data Source: <span className="font-medium">
-                      {isDataImported ? "test-data.csv" : "Sample Dataset"}
+                    SOURCE: <span className="text-technical">
+                      {isDataImported ? "test-data.csv" : "sample.dataset"}
                     </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="academic-card technical-hover">
+              <CardHeader className="pb-2">
+                <CardTitle className="font-mono-technical text-xs tracking-wide">POINT_SIZE</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Size</span>
+                  <span className="text-technical text-xs">{pointSize[0]}px</span>
+                </div>
+                <div className="px-1">
+                  <Slider
+                    value={pointSize}
+                    onValueChange={setPointSize}
+                    max={15}
+                    min={2}
+                    step={1}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
+                    <span>2px</span>
+                    <span>15px</span>
                   </div>
                 </div>
               </CardContent>
@@ -1122,46 +1454,163 @@ export default function EmbeddingsExplorer() {
             onMouseDown={() => handleMouseDown("left")}
           >
             <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <GripVertical className="w-4 h-4 text-blue-500" />
+              <GripVertical className="w-3 h-3 text-primary" />
             </div>
           </div>
         </div>
 
         {/* Center - Visualization */}
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex-1 p-6">
-            <Card className="h-full shadow-sm">
+          <div className="flex-1 p-4">
+            <Card className="h-full shadow-sm academic-card">
               <CardContent className="h-full p-0">
-                <div className="relative w-full h-full min-h-[500px] rounded-lg overflow-hidden bg-gradient-to-br from-slate-50 to-white">
-                  <svg width="100%" height="100%" viewBox="0 0 500 500" className="w-full h-full">
-                    {/* Enhanced Grid */}
+                <div className="relative w-full h-full min-h-[400px] rounded-lg overflow-hidden viz-grid">
+                  {/* Interaction Controls */}
+                  <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5">
+                    {/* Interaction Mode Toggle */}
+                    <div className="flex flex-col gap-0.5 bg-card/90 backdrop-blur rounded p-0.5 border">
+                      <Button
+                        variant={interactionMode === 'select' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={setSelectMode}
+                        className="w-6 h-6 p-0 technical-hover"
+                        title="Select Mode"
+                      >
+                        <MousePointer className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={interactionMode === 'pan' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={setPanMode}
+                        className="w-6 h-6 p-0 technical-hover"
+                        title="Pan Mode"
+                      >
+                        <Move className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={interactionMode === 'polygon' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={setPolygonMode}
+                        className="w-6 h-6 p-0 technical-hover"
+                        title="Polygon Select"
+                      >
+                        <Pentagon className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    
+                    {/* Zoom Controls */}
+                    <div className="flex flex-col gap-0.5 bg-card/90 backdrop-blur rounded p-0.5 border">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleZoomIn}
+                        className="w-6 h-6 p-0 technical-hover"
+                        disabled={zoomLevel >= 5}
+                        title="Zoom In"
+                      >
+                        <ZoomIn className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleZoomOut}
+                        className="w-6 h-6 p-0 technical-hover"
+                        disabled={zoomLevel <= 0.2}
+                        title="Zoom Out"
+                      >
+                        <ZoomOut className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleZoomReset}
+                        className="w-6 h-6 p-0 technical-hover"
+                        title="Reset View"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    
+                    <div className="text-xs text-technical text-center bg-card/90 backdrop-blur rounded px-1 py-0.5">
+                      {Math.round(zoomLevel * 100)}%
+                    </div>
+                    
+                    {isDrawingPolygon && (
+                      <div className="bg-card/90 backdrop-blur rounded p-1.5 border">
+                        <div className="text-xs text-technical mb-1">
+                          Polygon: {polygonPoints.length} points
+                        </div>
+                        <div className="flex gap-0.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={finishPolygonSelection}
+                            className="text-xs px-1.5 h-5 technical-hover"
+                            disabled={polygonPoints.length < 3}
+                          >
+                            Done
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={cancelPolygonSelection}
+                            className="text-xs px-1.5 h-5 technical-hover"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <svg 
+                    width="100%" 
+                    height="100%" 
+                    viewBox="0 0 500 500" 
+                    className={`w-full h-full ${interactionMode === 'pan' ? 'cursor-move' : interactionMode === 'polygon' ? 'cursor-crosshair' : 'cursor-default'}`}
+                    onMouseDown={handlePanStart}
+                    onMouseMove={handlePanMove}
+                    onMouseUp={handlePanEnd}
+                    onClick={handlePolygonClick}
+                  >
+                    {/* Simplified Grid */}
                     <defs>
                       <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-                        <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#f1f5f9" strokeWidth="1" />
-                      </pattern>
-                      <pattern id="gridMinor" width="10" height="10" patternUnits="userSpaceOnUse">
-                        <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#f8fafc" strokeWidth="0.5" />
+                        <path d="M 50 0 L 0 0 0 50" fill="none" stroke="hsl(var(--viz-grid))" strokeWidth="0.5" opacity="0.3" />
                       </pattern>
                     </defs>
-                    <rect width="100%" height="100%" fill="url(#gridMinor)" />
                     <rect width="100%" height="100%" fill="url(#grid)" />
-
-                    {/* Data points */}
+                    
+                    {/* Simple coordinate system border */}
+                    <rect x="50" y="50" width="400" height="400" fill="none" stroke="hsl(215 25% 25%)" strokeWidth="1.5" opacity="0.8" strokeDasharray="2,2" />
+                    
+                    {/* Data points layer - positioned below text */}
+                    <g className="points-layer">
                     {filteredData.map((point) => {
+                      // Find the corresponding cluster to get proper sizing
+                      const cluster = clusteredData.find(c => 
+                        c.id === point.id || (c.count === 1 && c.points[0].id === point.id)
+                      )
+                      
+                      if (!cluster) return null
+                      
                       const isSelected = selectedPoints.some((p) => p.id === point.id)
-                      const color = getPointColor(point)
+                      const color = cluster.count === 1 ? getPointColor(point) : getClusterColor(cluster, getPointColor)
+                      const size = cluster.count === 1 ? 
+                        (isSelected ? pointSize[0] + 2 : pointSize[0]) :
+                        getClusterSize(cluster, pointSize[0])
 
                       return (
                         <g key={point.id}>
                           <circle
                             cx={point.x}
                             cy={point.y}
-                            r={isSelected ? 9 : 7}
+                            r={size}
                             fill={color}
-                            stroke={isSelected ? "#1f2937" : "rgba(255,255,255,0.9)"}
-                            strokeWidth={isSelected ? 3 : 2}
-                            className="cursor-pointer hover:opacity-90 transition-all duration-200 drop-shadow-md"
-                            onClick={() => handlePointClick(point)}
+                            stroke={isSelected ? "hsl(var(--primary))" : cluster.count > 1 ? "rgba(0,0,0,0.2)" : "none"}
+                            strokeWidth={isSelected ? 2 : cluster.count > 1 ? 1 : 0}
+                            className="cursor-pointer hover:opacity-90 transition-all duration-200 drop-shadow-md technical-hover"
+                            onClick={(e) => handlePointClick(point, e)}
                             onMouseEnter={(e) => {
                               setHoveredPoint(point)
                               const rect = e.currentTarget.getBoundingClientRect()
@@ -1175,14 +1624,29 @@ export default function EmbeddingsExplorer() {
                             }}
                             onMouseLeave={() => setHoveredPoint(null)}
                           />
+                          {/* Show cluster count for multi-point clusters */}
+                          {cluster.count > 1 && (
+                            <text
+                              x={point.x}
+                              y={point.y + 1.5}
+                              textAnchor="middle"
+                              className="font-mono-technical pointer-events-none"
+                              fontSize="7"
+                              fill="white"
+                              fontWeight="bold"
+                            >
+                              {cluster.count}
+                            </text>
+                          )}
                           {isSelected && (
                             <text
                               x={point.x}
-                              y={point.y - 18}
+                              y={point.y - size - 6}
                               textAnchor="middle"
-                              className="text-xs fill-current pointer-events-none font-bold"
-                              fontSize="12"
-                              fill="#1f2937"
+                              className="font-mono-technical pointer-events-none"
+                              fontSize="8"
+                              fill="hsl(var(--primary))"
+                              fontWeight="bold"
                             >
                               ✓
                             </text>
@@ -1190,40 +1654,116 @@ export default function EmbeddingsExplorer() {
                         </g>
                       )
                     })}
+                    </g>
+                    
+                    {/* Polygon visualization - above points but below text */}
+                    {polygonPoints.length > 0 && (
+                      <g className="polygon-layer">
+                        {/* Polygon outline */}
+                        {polygonPoints.length >= 2 && (
+                          <polygon
+                            points={polygonPoints.map(p => `${p.x},${p.y}`).join(' ')}
+                            fill="hsl(var(--primary))"
+                            fillOpacity="0.1"
+                            stroke="hsl(var(--primary))"
+                            strokeWidth="2"
+                            strokeDasharray="4,4"
+                          />
+                        )}
+                        
+                        {/* Polygon corner points */}
+                        {polygonPoints.map((point, index) => (
+                          <circle
+                            key={index}
+                            cx={point.x}
+                            cy={point.y}
+                            r="3"
+                            fill="hsl(var(--primary))"
+                            stroke="white"
+                            strokeWidth="1.5"
+                            className="pointer-events-none"
+                          />
+                        ))}
+                        
+                        {/* Lines connecting points */}
+                        {polygonPoints.map((point, index) => {
+                          const nextPoint = polygonPoints[index + 1]
+                          if (!nextPoint) return null
+                          return (
+                            <line
+                              key={`line-${index}`}
+                              x1={point.x}
+                              y1={point.y}
+                              x2={nextPoint.x}
+                              y2={nextPoint.y}
+                              stroke="hsl(var(--primary))"
+                              strokeWidth="1.5"
+                              strokeDasharray="3,3"
+                              className="pointer-events-none"
+                            />
+                          )
+                        })}
+                      </g>
+                    )}
+                    
+                    {/* Text layer - positioned above everything to prevent clipping */}
+                    <g className="text-layer">
+                      {/* Axis labels with background */}
+                      <rect x="225" y="472" width="50" height="12" fill="hsl(var(--viz-background))" opacity="0.9" rx="2" />
+                      <text x="250" y="480" textAnchor="middle" className="font-mono-technical" fontSize="8" fill="hsl(var(--technical-text))">
+                        X-AXIS
+                      </text>
+                      
+                      <rect x="17" y="244" width="16" height="12" fill="hsl(var(--viz-background))" opacity="0.9" rx="2" transform="rotate(-90, 25, 250)" />
+                      <text x="25" y="250" textAnchor="middle" className="font-mono-technical" fontSize="8" fill="hsl(var(--technical-text))" transform="rotate(-90, 25, 250)">
+                        Y-AXIS
+                      </text>
+
+                      {/* Technical data count with background */}
+                      {filteredData.length > 0 && (
+                        <>
+                          <rect x="10" y="10" width="80" height="14" fill="hsl(var(--viz-background))" opacity="0.9" rx="2" />
+                          <text x="15" y="20" fill="hsl(var(--technical-text))" fontSize="9" className="font-mono-technical">
+                            [{filteredData.length}] POINTS
+                          </text>
+                        </>
+                      )}
+                    </g>
                   </svg>
 
-                  {/* Enhanced Tooltip */}
+                  {/* Enhanced Technical Tooltip */}
                   {hoveredPoint && (
                     <div
-                      className="absolute z-10 bg-white border border-gray-200 rounded-lg shadow-xl p-4 max-w-sm pointer-events-none"
+                      className="absolute z-10 academic-card rounded-lg shadow-xl p-3 max-w-xs pointer-events-none border-2"
                       style={{
                         left: tooltipPosition.x,
                         top: tooltipPosition.y,
                         transform: "translate(-50%, -100%)",
+                        borderColor: "hsl(var(--ring))"
                       }}
                     >
-                      <div className="space-y-3">
-                        <p className="text-sm font-medium leading-relaxed text-gray-900">{hoveredPoint.text}</p>
-                        <div className="flex gap-2 flex-wrap">
-                          <Badge variant="secondary" className="text-xs">
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium leading-relaxed text-gray-900">{hoveredPoint.text}</p>
+                        <div className="flex gap-1 flex-wrap">
+                          <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
                             {hoveredPoint.category}
                           </Badge>
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                             {hoveredPoint.source}
                           </Badge>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-                          <div>
-                            Confidence: <span className="font-medium">{hoveredPoint.confidence.toFixed(2)}</span>
+                        <div className="grid grid-cols-2 gap-1.5 text-xs">
+                          <div className="text-muted-foreground">
+                            CONF: <span className="text-technical">{hoveredPoint.confidence.toFixed(2)}</span>
                           </div>
-                          <div>
-                            Sentiment: <span className="font-medium">{hoveredPoint.sentiment.toFixed(2)}</span>
+                          <div className="text-muted-foreground">
+                            SENT: <span className="text-technical">{hoveredPoint.sentiment.toFixed(2)}</span>
                           </div>
-                          <div>
-                            Words: <span className="font-medium">{hoveredPoint.wordCount}</span>
+                          <div className="text-muted-foreground">
+                            WORDS: <span className="text-technical">{hoveredPoint.wordCount}</span>
                           </div>
-                          <div>
-                            Readability: <span className="font-medium">{hoveredPoint.readability.toFixed(1)}</span>
+                          <div className="text-muted-foreground">
+                            READ: <span className="text-technical">{hoveredPoint.readability.toFixed(1)}</span>
                           </div>
                         </div>
                       </div>
@@ -1235,134 +1775,145 @@ export default function EmbeddingsExplorer() {
           </div>
         </div>
 
-        {/* Right Sidebar - Selection & Manual Prompt */}
-        <div className="border-l bg-muted/20 flex flex-col relative" style={{ width: rightSidebarWidth }}>
+        {/* Right Sidebar - Tabbed Interface */}
+        <div className="border-l bg-sidebar-background flex flex-col relative" style={{ width: rightSidebarWidth }}>
           {/* Right Resize Handle */}
           <div
             ref={rightResizeRef}
-            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 transition-colors group"
+            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary transition-colors group"
             onMouseDown={() => handleMouseDown("right")}
           >
             <div className="absolute left-0 top-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <GripVertical className="w-4 h-4 text-blue-500" />
+              <GripVertical className="w-3 h-3 text-primary" />
             </div>
           </div>
 
-          <div className="p-4 border-b">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-sm">Selected Points ({selectedPoints.length})</h3>
-              {selectedPoints.length > 0 && (
-                <Button variant="ghost" size="sm" onClick={clearSelection}>
-                  <X className="w-4 h-4 mr-1" />
-                  Clear All
-                </Button>
-              )}
+          <Tabs value={rightSidebarTab} onValueChange={setRightSidebarTab} className="flex flex-col h-full">
+            {/* Tab Navigation */}
+            <div className="p-3 border-b border-sidebar-border">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="data" className="flex items-center gap-1 font-mono-technical">
+                  <Database className="w-3 h-3" />
+                  DATA [{selectedPoints.length}]
+                </TabsTrigger>
+                <TabsTrigger value="prompt" className="flex items-center gap-1 font-mono-technical">
+                  <MessageSquare className="w-3 h-3" />
+                  LLM
+                </TabsTrigger>
+              </TabsList>
             </div>
-          </div>
 
-          {/* Selected Points */}
-          <div className="flex-1 overflow-auto p-4 space-y-3">
-            {selectedPoints.length === 0 ? (
-              <div className="text-center text-muted-foreground py-12">
-                <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                  <Eye className="w-8 h-8 opacity-50" />
+            {/* Tab Content */}
+            <div className="flex-1" style={{ minHeight: '500px' }}>
+              <TabsContent value="data" className="h-full flex flex-col p-0 mt-0">
+                {/* Data Tab Header */}
+                <div className="p-3 border-b border-sidebar-border flex-shrink-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-mono-technical text-xs font-medium tracking-wide">SELECTED_POINTS [{selectedPoints.length}]</h3>
+                    {selectedPoints.length > 0 && (
+                      <Button variant="ghost" size="sm" onClick={clearSelection} className="technical-hover h-6 px-2 text-xs">
+                        <X className="w-3 h-3 mr-1" />
+                        Clear
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <p className="text-sm font-medium">No points selected</p>
-                <p className="text-xs mt-1">Click on data points in the visualization to select them</p>
-              </div>
-            ) : (
-              selectedPoints.map((point, index) => (
-                <Card key={point.id} className="relative hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-1 rounded">
-                            #{index + 1}
-                          </span>
-                          <div
-                            className="w-3 h-3 rounded-full border-2 border-white shadow-sm"
-                            style={{ backgroundColor: getPointColor(point) }}
-                          />
-                        </div>
-                        <p className="text-sm leading-relaxed text-gray-900 mb-3">{point.text}</p>
-                        <div className="flex gap-2 flex-wrap mb-2">
-                          <Badge variant="secondary" className="text-xs">
-                            {point.category}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {point.source}
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Confidence: {point.confidence.toFixed(2)} • Sentiment: {point.sentiment.toFixed(2)}
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeSelectedPoint(point.id)}
-                        className="shrink-0 hover:bg-red-50 hover:text-red-600"
+                
+                {/* Selected Points - Virtualized for performance */}
+                <div ref={dataTabRef} className="flex-1 overflow-hidden">
+                  <VirtualizedSelectedPoints
+                    selectedPoints={selectedPoints}
+                    getPointColor={getPointColor}
+                    removeSelectedPoint={removeSelectedPoint}
+                    containerHeight={dataTabHeight}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="prompt" className="h-full flex flex-col p-0 mt-0">
+                {/* Prompt Tab Header */}
+                <div className="p-3 border-b border-sidebar-border flex-shrink-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-mono-technical text-xs font-medium tracking-wide">PROMPT_INPUT</h3>
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="technical-hover h-6 px-2 text-xs"
+                        onClick={() => setPrompt('')}
+                        disabled={!prompt.trim()}
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-3 h-3" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="technical-hover h-6 px-2 text-xs"
+                        disabled={!prompt.trim()}
+                      >
+                        <Download className="w-3 h-3 mr-1" />
+                        Save
                       </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
+                  </div>
+                </div>
 
-          {/* Manual Prompt Input */}
-          <div className="border-t bg-background p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-sm">Manual Prompt Input</h3>
-              <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-1" />
-                Save
-              </Button>
+                {/* Manual Prompt Input - Force explicit height */}
+                <div className="p-3 flex flex-col space-y-3" style={{ height: 'calc(100vh - 300px)', minHeight: '400px' }}>
+                  <Textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Enter your prompt here. Examples:&#10;• Analyze the sentiment patterns in these texts&#10;• Summarize the main themes across these data points&#10;• Find common categories and explain the relationships&#10;• Identify any outliers or anomalies in this data"
+                    className="w-full h-48 text-xs resize-none overflow-y-auto border border-input rounded-md p-2"
+                    style={{ minHeight: '192px' }}
+                  />
+
+                  <div className="flex gap-2">
+                    <Button 
+                      className="w-full technical-hover transition-all duration-200 h-10 text-xs" 
+                      disabled={!prompt.trim() || selectedPoints.length === 0 || isAnalyzing}
+                      onClick={handleAnalyze}
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          <span className="font-mono-technical">ANALYZING...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-2" />
+                          <span className="font-mono-technical">SEND_TO_LLM</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground space-y-2 mt-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>CHARS: <span className="text-technical">{prompt.length}</span></div>
+                      <div>POINTS: <span className="text-technical">{selectedPoints.length}</span></div>
+                      {selectedPoints.length > 0 && prompt.trim() && (
+                        <>
+                          <div>TOKENS: <span className="text-technical">{estimatedTokens}</span></div>
+                          <div>COST: <span className="text-technical">${estimatedCost.toFixed(4)}</span></div>
+                        </>
+                      )}
+                    </div>
+                    {selectedPoints.length === 0 && (
+                      <div className="text-xs text-orange-600 mt-2 p-2 bg-orange-50 rounded">
+                        ⚠️ No data points selected for analysis
+                      </div>
+                    )}
+                    {!settings.llm.apiKey && (
+                      <div className="text-xs text-red-600 mt-2 p-2 bg-red-50 rounded">
+                        ⚠️ API key not configured
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
             </div>
-
-            <div className="space-y-3">
-              <Textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Enter your prompt here. You can reference the selected data points or write any custom prompt..."
-                className="min-h-[120px] text-sm resize-none"
-              />
-
-              <div className="flex gap-2">
-                <Button 
-                  className="flex-1" 
-                  disabled={!prompt.trim() || selectedPoints.length === 0 || isAnalyzing}
-                  onClick={handleAnalyze}
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4 mr-2" />
-                      Send to LLM
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              <div className="text-xs text-muted-foreground space-y-1">
-                <div>Characters: {prompt.length}</div>
-                <div>Selected points: {selectedPoints.length}</div>
-                {selectedPoints.length > 0 && prompt && (
-                  <>
-                    <div>Est. tokens: {estimatedTokens}</div>
-                    <div>Est. cost: ${estimatedCost.toFixed(4)}</div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
+          </Tabs>
         </div>
       </div>
 
@@ -1370,7 +1921,7 @@ export default function EmbeddingsExplorer() {
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Settings</DialogTitle>
+            <DialogTitle className="font-mono-technical tracking-wide">SYSTEM_SETTINGS</DialogTitle>
             <DialogDescription>
               Configure your LLM API settings and display preferences.
             </DialogDescription>
@@ -1379,14 +1930,15 @@ export default function EmbeddingsExplorer() {
           <div className="space-y-6">
             {/* LLM Settings */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">LLM Configuration</h3>
+              <h3 className="font-mono-technical text-lg font-medium tracking-wide">LLM_CONFIGURATION</h3>
               
               <div className="space-y-2">
-                <Label htmlFor="api-key">API Key</Label>
+                <Label htmlFor="api-key" className="font-mono-technical text-xs tracking-wider">API_KEY</Label>
                 <Input
                   id="api-key"
                   type="password"
                   placeholder="sk-..."
+                  className="technical-input"
                   value={settings.llm.apiKey}
                   onChange={(e) => setSettings(prev => ({
                     ...prev,
@@ -1402,19 +1954,29 @@ export default function EmbeddingsExplorer() {
                 <Label htmlFor="model">Model</Label>
                 <Select
                   value={settings.llm.model}
-                  onValueChange={(value) => setSettings(prev => ({
-                    ...prev,
-                    llm: { ...prev.llm, model: value }
-                  }))}
+                  onValueChange={(value) => {
+                    setSettings(prev => ({
+                      ...prev,
+                      llm: { 
+                        ...prev.llm, 
+                        model: value,
+                        endpoint: value.includes('claude') 
+                          ? 'https://api.anthropic.com/v1/messages'
+                          : 'https://api.openai.com/v1/chat/completions'
+                      }
+                    }))
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo ($0.002/1K tokens)</SelectItem>
-                    <SelectItem value="gpt-4">GPT-4 ($0.03/1K tokens)</SelectItem>
-                    <SelectItem value="gpt-4-turbo-preview">GPT-4 Turbo ($0.01/1K tokens)</SelectItem>
+                    <SelectItem value="gpt-4o-mini">GPT-4o Mini ($0.0015/1K tokens)</SelectItem>
                     <SelectItem value="gpt-4o">GPT-4o ($0.005/1K tokens)</SelectItem>
+                    <SelectItem value="gpt-4-turbo">GPT-4 Turbo ($0.01/1K tokens)</SelectItem>
+                    <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo ($0.002/1K tokens)</SelectItem>
+                    <SelectItem value="claude-3-haiku">Claude 3 Haiku ($0.00025/1K tokens)</SelectItem>
+                    <SelectItem value="claude-3-5-sonnet">Claude 3.5 Sonnet ($0.003/1K tokens)</SelectItem>
                     <SelectItem value="claude-3-sonnet">Claude 3 Sonnet ($0.003/1K tokens)</SelectItem>
                     <SelectItem value="claude-3-opus">Claude 3 Opus ($0.015/1K tokens)</SelectItem>
                   </SelectContent>
@@ -1422,24 +1984,31 @@ export default function EmbeddingsExplorer() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="endpoint">API Endpoint</Label>
+                <Label htmlFor="endpoint" className="font-mono-technical text-xs tracking-wider">API_ENDPOINT</Label>
                 <Input
                   id="endpoint"
+                  className="technical-input"
                   value={settings.llm.endpoint}
                   onChange={(e) => setSettings(prev => ({
                     ...prev,
                     llm: { ...prev.llm, endpoint: e.target.value }
                   }))}
                 />
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p><strong>OpenAI:</strong> https://api.openai.com/v1/chat/completions</p>
+                  <p><strong>Anthropic:</strong> https://api.anthropic.com/v1/messages</p>
+                  <p><strong>Custom:</strong> Your API-compatible endpoint</p>
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="max-tokens">Max Tokens</Label>
+                <Label htmlFor="max-tokens" className="font-mono-technical text-xs tracking-wider">MAX_TOKENS</Label>
                 <Input
                   id="max-tokens"
                   type="number"
                   min="100"
                   max="4000"
+                  className="technical-input"
                   value={settings.llm.maxTokens}
                   onChange={(e) => setSettings(prev => ({
                     ...prev,
@@ -1451,7 +2020,7 @@ export default function EmbeddingsExplorer() {
 
             {/* API Fields */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Data Fields to Send to API</h3>
+              <h3 className="font-mono-technical text-lg font-medium tracking-wide">API_DATA_FIELDS</h3>
               <div className="grid grid-cols-2 gap-4">
                 {['text', 'category', 'source', 'confidence', 'sentiment', 'wordCount', 'readability', 'timestamp'].map((field) => (
                   <div key={field} className="flex items-center space-x-2">
@@ -1467,7 +2036,7 @@ export default function EmbeddingsExplorer() {
                         }))
                       }}
                     />
-                    <Label htmlFor={field} className="capitalize">{field}</Label>
+                    <Label htmlFor={field} className="font-mono-technical text-xs tracking-wider uppercase">{field}</Label>
                   </div>
                 ))}
               </div>
@@ -1485,11 +2054,11 @@ export default function EmbeddingsExplorer() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSettings(false)}>
-              Cancel
+            <Button variant="outline" onClick={() => setShowSettings(false)} className="technical-hover">
+              <span className="font-mono-technical">CANCEL</span>
             </Button>
-            <Button onClick={handleSaveSettings}>
-              Save Settings
+            <Button onClick={handleSaveSettings} className="technical-hover">
+              <span className="font-mono-technical">SAVE_SETTINGS</span>
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1499,7 +2068,7 @@ export default function EmbeddingsExplorer() {
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Import CSV Data</DialogTitle>
+            <DialogTitle className="font-mono-technical tracking-wide">IMPORT_CSV_DATA</DialogTitle>
             <DialogDescription>
               Select the columns for X and Y coordinates, and optionally a text column.
             </DialogDescription>
@@ -1573,14 +2142,22 @@ export default function EmbeddingsExplorer() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
-              Cancel
+            <Button variant="outline" onClick={() => setShowImportDialog(false)} className="technical-hover">
+              <span className="font-mono-technical">CANCEL</span>
             </Button>
             <Button 
               onClick={handleImportData}
-              disabled={!selectedXColumn || !selectedYColumn}
+              disabled={!selectedXColumn || !selectedYColumn || isProcessingLargeFile}
+              className="technical-hover"
             >
-              Import Data
+              {isProcessingLargeFile ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <span className="font-mono-technical">PROCESSING... {importProgress}%</span>
+                </>
+              ) : (
+                <span className="font-mono-technical">IMPORT_DATA</span>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1612,21 +2189,59 @@ export default function EmbeddingsExplorer() {
           
           <div className="space-y-4">
             {analysisResult?.success ? (
-              <div className="prose prose-sm max-w-none">
-                <div className="p-4 bg-slate-50 rounded-lg">
-                  <pre className="whitespace-pre-wrap text-sm">{analysisResult.content}</pre>
+              <div className="space-y-3">
+                <div className="bg-slate-50 border rounded-lg p-4">
+                  <div className="prose prose-sm max-w-none">
+                    <div className="whitespace-pre-wrap text-sm leading-relaxed">{analysisResult.content}</div>
+                  </div>
                 </div>
+                {analysisResult.tokensUsed && (
+                  <div className="flex justify-between text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                    <span>Model: {settings.llm.model}</span>
+                    <span>Tokens: {analysisResult.tokensUsed}</span>
+                    <span>Cost: ${analysisResult.cost?.toFixed(4) || '0.0000'}</span>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-700">{analysisResult?.error}</p>
+              <div className="space-y-3">
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-red-800 mb-1">Analysis Failed</p>
+                      <p className="text-xs text-red-700">{analysisResult?.error}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  <p>Try:</p>
+                  <ul className="list-disc list-inside space-y-1 mt-1">
+                    <li>Checking your API key in settings</li>
+                    <li>Ensuring you have sufficient API credits</li>
+                    <li>Reducing the prompt length or number of data points</li>
+                    <li>Checking your internet connection</li>
+                  </ul>
+                </div>
               </div>
             )}
           </div>
 
-          <DialogFooter>
-            <Button onClick={() => setShowAnalysisResult(false)}>
-              Close
+          <DialogFooter className="flex justify-between">
+            {analysisResult?.success && (
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  navigator.clipboard.writeText(analysisResult.content || '')
+                  toast({ title: "Copied to clipboard", description: "Analysis result copied successfully." })
+                }} 
+                className="technical-hover"
+              >
+                <span className="font-mono-technical">COPY</span>
+              </Button>
+            )}
+            <Button onClick={() => setShowAnalysisResult(false)} className="technical-hover ml-auto">
+              <span className="font-mono-technical">CLOSE</span>
             </Button>
           </DialogFooter>
         </DialogContent>

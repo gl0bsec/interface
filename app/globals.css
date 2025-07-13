@@ -4,39 +4,78 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
+    /* Base colors - sophisticated neutrals with paper texture */
+    --background: 35 15% 92%;
+    --foreground: 215 25% 26.1%;
+    --card: 35 20% 96%;
+    --card-foreground: 215 25% 26.1%;
+    --popover: 35 20% 96%;
+    --popover-foreground: 215 25% 26.1%;
+    
+    /* Primary - Strategic red accent like Equalizer */
+    --primary: 0 84% 60%;
+    --primary-foreground: 0 0% 98%;
+    
+    /* Secondary - Enhanced sophisticated grays */
+    --secondary: 210 16% 93%;
+    --secondary-foreground: 215 25% 26.1%;
+    --muted: 210 20% 95%;
+    --muted-foreground: 215 16% 46.9%;
+    --accent: 210 20% 95%;
+    --accent-foreground: 215 25% 26.1%;
+    
+    /* Destructive - consistent red */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    
+    /* Refined borders and inputs */
+    --border: 210 20% 75%;
+    --input: 210 20% 75%;
+    --ring: 0 84% 60%;
+    
+    /* Enhanced Design Are.na gradient system */
+    --vis-teal: 178 64% 47%;
+    --vis-teal-light: 178 64% 87%;
+    --vis-yellow: 45 93% 58%;
+    --vis-yellow-light: 45 93% 88%;
+    --vis-orange: 25 95% 53%;
+    --vis-orange-light: 25 95% 83%;
+    --vis-red: 0 84% 60%;
+    --vis-red-light: 0 84% 90%;
+    --vis-purple: 280 65% 52%;
+    --vis-purple-light: 280 65% 82%;
+    
+    /* Technical chart colors for embeddings */
+    --chart-1: 178 64% 47%;
+    --chart-2: 45 93% 58%;
+    --chart-3: 25 95% 53%;
+    --chart-4: 0 84% 60%;
+    --chart-5: 280 65% 52%;
+    
+    /* Sophisticated visualization backgrounds */
+    --viz-background: 210 25% 98.5%;
+    --viz-grid: 210 25% 80%;
+    --viz-grid-minor: 210 15% 90%;
+    --viz-border: 210 25% 70%;
+    
+    /* Technical UI elements */
+    --technical-bg: 215 20% 95%;
+    --technical-border: 215 20% 75%;
+    --technical-text: 215 25% 35%;
+    --coordinates-bg: 0 0% 97%;
+    --coordinates-border: 0 0% 80%;
+    
+    --radius: 0.375rem;
+    
+    /* Enhanced sidebar styling */
+    --sidebar-background: 210 25% 97%;
+    --sidebar-foreground: 215 25% 26.1%;
+    --sidebar-primary: 215 25% 26.1%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 210 20% 94%;
+    --sidebar-accent-foreground: 215 25% 26.1%;
+    --sidebar-border: 210 20% 75%;
+    --sidebar-ring: 0 84% 60%;
   }
 
   .dark {
@@ -81,5 +120,120 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+@layer utilities {
+  .font-mono-technical {
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    font-feature-settings: "tnum", "zero";
+    letter-spacing: -0.025em;
+  }
+  
+  .text-technical {
+    @apply font-mono-technical text-xs;
+    color: hsl(var(--technical-text));
+  }
+  
+  .bg-technical {
+    background-color: hsl(var(--technical-bg));
+    border: 1px solid hsl(var(--technical-border));
+  }
+  
+  .bg-coordinates {
+    background-color: hsl(var(--coordinates-bg));
+    border: 1px solid hsl(var(--coordinates-border));
+  }
+  
+  .gradient-vis-horizontal {
+    background: linear-gradient(90deg, 
+      hsl(var(--vis-teal)) 0%, 
+      hsl(var(--vis-yellow)) 50%, 
+      hsl(var(--vis-orange)) 100%);
+  }
+  
+  .gradient-vis-vertical {
+    background: linear-gradient(180deg, 
+      hsl(var(--vis-teal)) 0%, 
+      hsl(var(--vis-yellow)) 50%, 
+      hsl(var(--vis-orange)) 100%);
+  }
+  
+  .viz-grid {
+    background-color: hsl(var(--viz-background));
+    background-image: 
+      linear-gradient(hsl(var(--viz-grid-minor)) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--viz-grid-minor)) 1px, transparent 1px),
+      linear-gradient(hsl(var(--viz-grid)) 2px, transparent 2px),
+      linear-gradient(90deg, hsl(var(--viz-grid)) 2px, transparent 2px);
+    background-size: 10px 10px, 10px 10px, 50px 50px, 50px 50px;
+  }
+  
+  .chart-point-1 {
+    fill: hsl(var(--chart-1));
+  }
+  
+  .chart-point-2 {
+    fill: hsl(var(--chart-2));
+  }
+  
+  .chart-point-3 {
+    fill: hsl(var(--chart-3));
+  }
+  
+  .chart-point-4 {
+    fill: hsl(var(--chart-4));
+  }
+  
+  .chart-point-5 {
+    fill: hsl(var(--chart-5));
+  }
+  
+  .technical-hover {
+    @apply transition-all duration-200 ease-in-out;
+  }
+  
+  .technical-hover:hover {
+    @apply shadow-sm scale-[1.02];
+    border-color: hsl(var(--ring));
+  }
+  
+  .academic-card {
+    @apply bg-card border border-border shadow-sm;
+    backdrop-filter: blur(8px);
+    background-color: hsla(var(--card), 0.95);
+    background-image: 
+      radial-gradient(circle at 1px 1px, rgba(0,0,0,0.02) 1px, transparent 0),
+      linear-gradient(45deg, transparent 40%, rgba(0,0,0,0.005) 50%, transparent 60%);
+    background-size: 20px 20px, 40px 40px;
+  }
+  
+  .paper-texture {
+    background-color: hsl(var(--background));
+    background-image: 
+      radial-gradient(circle at 2px 2px, rgba(0,0,0,0.02) 1px, transparent 0),
+      radial-gradient(circle at 1px 1px, rgba(139,69,19,0.01) 1px, transparent 0),
+      linear-gradient(45deg, transparent 30%, rgba(0,0,0,0.003) 50%, transparent 70%),
+      linear-gradient(-45deg, transparent 30%, rgba(139,69,19,0.002) 50%, transparent 70%);
+    background-size: 25px 25px, 15px 15px, 60px 60px, 80px 80px;
+    background-position: 0 0, 8px 8px, 0 0, 20px 20px;
+  }
+  
+  .technical-input {
+    @apply bg-technical font-mono-technical text-xs;
+    border: 1px solid hsl(var(--technical-border));
+  }
+  
+  .technical-input:focus {
+    border-color: hsl(var(--ring));
+    box-shadow: 0 0 0 2px hsla(var(--ring), 0.2);
+  }
+  
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
   }
 }
