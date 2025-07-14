@@ -81,10 +81,23 @@ export interface LLMSettings {
   maxTokens: number
 }
 
+export interface ColorGradientSettings {
+  reversed: boolean
+  startColor: string
+  endColor: string
+  preset: 'default' | 'viridis' | 'plasma' | 'cool' | 'warm' | 'custom'
+}
+
 export interface AppSettings {
   llm: LLMSettings
   displayFields: string[]
   apiFields: string[]
+  colorGradient: ColorGradientSettings
+  performance: {
+    useCanvasRenderer: boolean
+    pointThreshold: number
+    enableViewportCulling: boolean
+  }
 }
 
 // CSV Import interfaces

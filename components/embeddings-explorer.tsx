@@ -358,6 +358,7 @@ export default function EmbeddingsExplorer() {
   const [hoveredPoint, setHoveredPoint] = useState<EmbeddingPoint | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition>({ x: 0, y: 0 })
   const [colorBy, setColorBy] = useState("category")
+  const [reverseGradient, setReverseGradient] = useState(false)
   const [showSearchHelp, setShowSearchHelp] = useState(false)
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(320)
   const [rightSidebarWidth, setRightSidebarWidth] = useState(380)
@@ -365,7 +366,7 @@ export default function EmbeddingsExplorer() {
   
   // Zoom and point size state
   const [zoomLevel, setZoomLevel] = useState(1)
-  const [pointSize, setPointSize] = useState([7])
+  const [pointSize, setPointSize] = useState([3])
   
   // Interaction mode and pan state
   const [interactionMode, setInteractionMode] = useState<'select' | 'pan' | 'polygon'>('select')
@@ -431,7 +432,7 @@ export default function EmbeddingsExplorer() {
       if (['id', 'text', 'x', 'y', 'timestamp'].includes(key)) return
 
       // Check if this field is mostly numerical or categorical
-      const values = currentData.slice(0, 50).map(point => (point as Record<string, unknown>)[key]).filter(v => v !== undefined && v !== null && v !== '')
+      const values = currentData.slice(0, 50).map(point => (point as unknown as Record<string, unknown>)[key]).filter(v => v !== undefined && v !== null && v !== '')
       
       if (values.length === 0) return
 
@@ -610,16 +611,24 @@ export default function EmbeddingsExplorer() {
     setIsDrawingPolygon(true)
   }, [])
 
-  // Pan handlers
+  // Mouse wheel zoom handler
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault()
+    const delta = e.deltaY > 0 ? 0.9 : 1.1
+    setZoomLevel(prev => Math.max(0.1, Math.min(10, prev * delta)))
+  }, [])
+
+  // Pan handlers - now work with middle mouse button or when in pan mode
   const handlePanStart = useCallback((e: React.MouseEvent) => {
-    if (interactionMode === 'pan') {
+    if (interactionMode === 'pan' || e.button === 1) {
       setIsPanning(true)
       setPanStart({ x: e.clientX, y: e.clientY })
+      e.preventDefault()
     }
   }, [interactionMode])
 
   const handlePanMove = useCallback((e: React.MouseEvent) => {
-    if (isPanning && interactionMode === 'pan') {
+    if (isPanning && (interactionMode === 'pan' || e.buttons === 4)) {
       const deltaX = e.clientX - panStart.x
       const deltaY = e.clientY - panStart.y
       setPanOffset(prev => ({
@@ -742,7 +751,8 @@ export default function EmbeddingsExplorer() {
       const allValues = currentData.map((p) => p[colorBy as keyof EmbeddingPoint] as number)
       const min = Math.min(...allValues)
       const max = Math.max(...allValues)
-      const normalized = (value - min) / (max - min)
+      const baseNormalized = (value - min) / (max - min)
+      const normalized = reverseGradient ? 1 - baseNormalized : baseNormalized
 
       if (colorBy === "sentiment") {
         // Enhanced sentiment mapping with gradient colors
@@ -769,7 +779,7 @@ export default function EmbeddingsExplorer() {
         }
       }
     }
-  }, [colorBy, currentData, colorOptions])
+  }, [colorBy, currentData, colorOptions, reverseGradient])
 
   // Generate legend items
   const legendItems = useMemo(() => {
@@ -1356,14 +1366,27 @@ export default function EmbeddingsExplorer() {
                 )}
                 {colorOptions.find((opt) => opt.value === colorBy)?.type === "numerical" && (
                   <div className="mt-3">
-                    <div className="text-xs text-muted-foreground mb-1">Scale:</div>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-xs text-muted-foreground">Scale:</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Reverse</span>
+                        <Switch
+                          checked={reverseGradient}
+                          onCheckedChange={setReverseGradient}
+                        />
+                      </div>
+                    </div>
                     <div
                       className="h-2 rounded-full border"
                       style={{
                         background:
                           colorBy === "sentiment"
-                            ? "linear-gradient(to right, hsl(var(--vis-red)), hsl(210 25% 95%), hsl(var(--vis-teal)))"
-                            : "linear-gradient(to right, hsl(var(--vis-teal)), hsl(var(--vis-yellow)), hsl(var(--vis-orange)), hsl(var(--vis-red)))",
+                            ? reverseGradient
+                              ? "linear-gradient(to right, hsl(var(--vis-teal)), hsl(210 25% 95%), hsl(var(--vis-red)))"
+                              : "linear-gradient(to right, hsl(var(--vis-red)), hsl(210 25% 95%), hsl(var(--vis-teal)))"
+                            : reverseGradient
+                              ? "linear-gradient(to right, hsl(var(--vis-red)), hsl(var(--vis-orange)), hsl(var(--vis-yellow)), hsl(var(--vis-teal)))"
+                              : "linear-gradient(to right, hsl(var(--vis-teal)), hsl(var(--vis-yellow)), hsl(var(--vis-orange)), hsl(var(--vis-red)))",
                       }}
                     />
                   </div>
@@ -1427,20 +1450,20 @@ export default function EmbeddingsExplorer() {
               <CardContent className="space-y-2 p-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Size</span>
-                  <span className="text-technical text-xs">{pointSize[0]}px</span>
+                  <span className="text-technical text-xs">{pointSize[0].toFixed(1)}px</span>
                 </div>
                 <div className="px-1">
                   <Slider
                     value={pointSize}
                     onValueChange={setPointSize}
-                    max={15}
-                    min={2}
-                    step={1}
+                    max={10}
+                    min={0.3}
+                    step={0.1}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
-                    <span>2px</span>
-                    <span>15px</span>
+                    <span>0.3px</span>
+                    <span>10px</span>
                   </div>
                 </div>
               </CardContent>
@@ -1571,6 +1594,7 @@ export default function EmbeddingsExplorer() {
                     onMouseDown={handlePanStart}
                     onMouseMove={handlePanMove}
                     onMouseUp={handlePanEnd}
+                    onWheel={handleWheel}
                     onClick={handlePolygonClick}
                   >
                     {/* Simplified Grid */}

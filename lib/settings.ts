@@ -8,7 +8,18 @@ const DEFAULT_SETTINGS: AppSettings = {
     maxTokens: 1000
   },
   displayFields: ['text', 'category', 'source', 'confidence', 'sentiment'],
-  apiFields: ['text', 'category', 'source']
+  apiFields: ['text', 'category', 'source'],
+  colorGradient: {
+    reversed: false,
+    startColor: '#2DD4BF',
+    endColor: '#EF4444',
+    preset: 'default'
+  },
+  performance: {
+    useCanvasRenderer: true,
+    pointThreshold: 200,
+    enableViewportCulling: true
+  }
 }
 
 export function loadSettings(): AppSettings {
@@ -61,4 +72,37 @@ export function estimateTokens(text: string): number {
 export function estimateCost(totalTokens: number, model: string): number {
   const pricePerToken = getModelPrice(model) / 1000
   return totalTokens * pricePerToken
+}
+
+export function getGradientColors(preset: string): { startColor: string; endColor: string } {
+  const gradients = {
+    default: { startColor: '#2DD4BF', endColor: '#EF4444' },
+    viridis: { startColor: '#440154', endColor: '#FDE725' },
+    plasma: { startColor: '#0D0887', endColor: '#F0F921' },
+    cool: { startColor: '#00FFFF', endColor: '#0000FF' },
+    warm: { startColor: '#FFFF00', endColor: '#FF0000' },
+    custom: { startColor: '#2DD4BF', endColor: '#EF4444' }
+  }
+  return gradients[preset as keyof typeof gradients] || gradients.default
+}
+
+export function interpolateColor(startColor: string, endColor: string, factor: number): string {
+  // Convert hex to RGB
+  const hexToRgb = (hex: string) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : { r: 0, g: 0, b: 0 }
+  }
+
+  const start = hexToRgb(startColor)
+  const end = hexToRgb(endColor)
+  
+  const r = Math.round(start.r + (end.r - start.r) * factor)
+  const g = Math.round(start.g + (end.g - start.g) * factor)
+  const b = Math.round(start.b + (end.b - start.b) * factor)
+  
+  return `rgb(${r}, ${g}, ${b})`
 }
