@@ -1343,16 +1343,6 @@ eval("// This regex will have fast negatives meaning valid identifiers may not p
 
 /***/ }),
 
-/***/ "(rsc)/./node_modules/next/font/google/target.css?{\"path\":\"app/layout.tsx\",\"import\":\"Inter\",\"arguments\":[{\"subsets\":[\"latin\"]}],\"variableName\":\"inter\"}":
-/*!********************************************************************************************************************************************************!*\
-  !*** ./node_modules/next/font/google/target.css?{"path":"app/layout.tsx","import":"Inter","arguments":[{"subsets":["latin"]}],"variableName":"inter"} ***!
-  \********************************************************************************************************************************************************/
-/***/ ((module) => {
-
-eval("// Exports\nmodule.exports = {\n\t\"style\": {\"fontFamily\":\"'Inter', 'Inter Fallback'\",\"fontStyle\":\"normal\"},\n\t\"className\": \"__className_e8ce0c\"\n};\n//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHJzYykvLi9ub2RlX21vZHVsZXMvbmV4dC9mb250L2dvb2dsZS90YXJnZXQuY3NzP3tcInBhdGhcIjpcImFwcC9sYXlvdXQudHN4XCIsXCJpbXBvcnRcIjpcIkludGVyXCIsXCJhcmd1bWVudHNcIjpbe1wic3Vic2V0c1wiOltcImxhdGluXCJdfV0sXCJ2YXJpYWJsZU5hbWVcIjpcImludGVyXCJ9IiwibWFwcGluZ3MiOiJBQUFBO0FBQ0E7QUFDQSxXQUFXLDhEQUE4RDtBQUN6RTtBQUNBIiwic291cmNlcyI6WyIvVXNlcnMvZ2Vpc3QvRGVza3RvcC9Qcm9qZWN0cy9pbnRlcmZhY2Uvbm9kZV9tb2R1bGVzL25leHQvZm9udC9nb29nbGUvdGFyZ2V0LmNzcz97XCJwYXRoXCI6XCJhcHAvbGF5b3V0LnRzeFwiLFwiaW1wb3J0XCI6XCJJbnRlclwiLFwiYXJndW1lbnRzXCI6W3tcInN1YnNldHNcIjpbXCJsYXRpblwiXX1dLFwidmFyaWFibGVOYW1lXCI6XCJpbnRlclwifSJdLCJzb3VyY2VzQ29udGVudCI6WyIvLyBFeHBvcnRzXG5tb2R1bGUuZXhwb3J0cyA9IHtcblx0XCJzdHlsZVwiOiB7XCJmb250RmFtaWx5XCI6XCInSW50ZXInLCAnSW50ZXIgRmFsbGJhY2snXCIsXCJmb250U3R5bGVcIjpcIm5vcm1hbFwifSxcblx0XCJjbGFzc05hbWVcIjogXCJfX2NsYXNzTmFtZV9lOGNlMGNcIlxufTtcbiJdLCJuYW1lcyI6W10sImlnbm9yZUxpc3QiOlswXSwic291cmNlUm9vdCI6IiJ9\n//# sourceURL=webpack-internal:///(rsc)/./node_modules/next/font/google/target.css?{\"path\":\"app/layout.tsx\",\"import\":\"Inter\",\"arguments\":[{\"subsets\":[\"latin\"]}],\"variableName\":\"inter\"}\n");
-
-/***/ }),
-
 /***/ "(ssr)/./node_modules/next/dist/client/app-build-id.js":
 /*!*******************************************************!*\
   !*** ./node_modules/next/dist/client/app-build-id.js ***!

@@ -1780,7 +1780,7 @@ export default function EmbeddingsExplorer() {
           {/* Right Resize Handle */}
           <div
             ref={rightResizeRef}
-            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary transition-colors group"
+            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary transition-colors group z-10"
             onMouseDown={() => handleMouseDown("right")}
           >
             <div className="absolute left-0 top-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1790,28 +1790,42 @@ export default function EmbeddingsExplorer() {
 
           <Tabs value={rightSidebarTab} onValueChange={setRightSidebarTab} className="flex flex-col h-full">
             {/* Tab Navigation */}
-            <div className="p-3 border-b border-sidebar-border">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="data" className="flex items-center gap-1 font-mono-technical">
+            <div className="p-3 border-b border-sidebar-border bg-sidebar-background sticky top-0 z-20">
+              <TabsList className="grid w-full grid-cols-2 bg-white">
+                <TabsTrigger 
+                  value="data" 
+                  className="flex items-center gap-1 font-mono-technical text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
                   <Database className="w-3 h-3" />
                   DATA [{selectedPoints.length}]
                 </TabsTrigger>
-                <TabsTrigger value="prompt" className="flex items-center gap-1 font-mono-technical">
+                <TabsTrigger 
+                  value="prompt" 
+                  className="flex items-center gap-1 font-mono-technical text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
                   <MessageSquare className="w-3 h-3" />
                   LLM
                 </TabsTrigger>
               </TabsList>
             </div>
 
-            {/* Tab Content */}
-            <div className="flex-1" style={{ minHeight: '500px' }}>
-              <TabsContent value="data" className="h-full flex flex-col p-0 mt-0">
+            {/* Tab Content Container */}
+            <div className="flex-1 overflow-hidden">
+              {/* Data Tab */}
+              <TabsContent value="data" className="h-full flex-col m-0 data-[state=active]:flex data-[state=inactive]:hidden">
                 {/* Data Tab Header */}
-                <div className="p-3 border-b border-sidebar-border flex-shrink-0">
+                <div className="p-3 border-b border-sidebar-border bg-sidebar-background flex-shrink-0">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-mono-technical text-xs font-medium tracking-wide">SELECTED_POINTS [{selectedPoints.length}]</h3>
+                    <h3 className="font-mono-technical text-xs font-medium tracking-wide text-foreground">
+                      SELECTED_POINTS [{selectedPoints.length}]
+                    </h3>
                     {selectedPoints.length > 0 && (
-                      <Button variant="ghost" size="sm" onClick={clearSelection} className="technical-hover h-6 px-2 text-xs">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={clearSelection} 
+                        className="technical-hover h-6 px-2 text-xs hover:bg-destructive/10 hover:text-destructive"
+                      >
                         <X className="w-3 h-3 mr-1" />
                         Clear
                       </Button>
@@ -1819,29 +1833,35 @@ export default function EmbeddingsExplorer() {
                   </div>
                 </div>
                 
-                {/* Selected Points - Virtualized for performance */}
-                <div ref={dataTabRef} className="flex-1 overflow-hidden">
-                  <VirtualizedSelectedPoints
-                    selectedPoints={selectedPoints}
-                    getPointColor={getPointColor}
-                    removeSelectedPoint={removeSelectedPoint}
-                    containerHeight={dataTabHeight}
-                  />
+                {/* Selected Points Container */}
+                <div className="flex-1 overflow-hidden bg-sidebar-background">
+                  <div ref={dataTabRef} className="h-full">
+                    <VirtualizedSelectedPoints
+                      selectedPoints={selectedPoints}
+                      getPointColor={getPointColor}
+                      removeSelectedPoint={removeSelectedPoint}
+                      containerHeight={dataTabHeight}
+                    />
+                  </div>
                 </div>
               </TabsContent>
 
-              <TabsContent value="prompt" className="h-full flex flex-col p-0 mt-0">
+              {/* Prompt Tab */}
+              <TabsContent value="prompt" className="h-full flex-col m-0 data-[state=active]:flex data-[state=inactive]:hidden">
                 {/* Prompt Tab Header */}
-                <div className="p-3 border-b border-sidebar-border flex-shrink-0">
+                <div className="p-3 border-b border-sidebar-border bg-sidebar-background flex-shrink-0">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-mono-technical text-xs font-medium tracking-wide">PROMPT_INPUT</h3>
+                    <h3 className="font-mono-technical text-xs font-medium tracking-wide text-foreground">
+                      PROMPT_INPUT
+                    </h3>
                     <div className="flex gap-1">
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="technical-hover h-6 px-2 text-xs"
+                        className="technical-hover h-6 px-2 text-xs hover:bg-destructive/10 hover:text-destructive"
                         onClick={() => setPrompt('')}
                         disabled={!prompt.trim()}
+                        title="Clear prompt"
                       >
                         <X className="w-3 h-3" />
                       </Button>
@@ -1850,6 +1870,7 @@ export default function EmbeddingsExplorer() {
                         size="sm" 
                         className="technical-hover h-6 px-2 text-xs"
                         disabled={!prompt.trim()}
+                        title="Save prompt"
                       >
                         <Download className="w-3 h-3 mr-1" />
                         Save
@@ -1858,57 +1879,82 @@ export default function EmbeddingsExplorer() {
                   </div>
                 </div>
 
-                {/* Manual Prompt Input - Force explicit height */}
-                <div className="p-3 flex flex-col space-y-3" style={{ height: 'calc(100vh - 300px)', minHeight: '400px' }}>
-                  <Textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Enter your prompt here. Examples:&#10;• Analyze the sentiment patterns in these texts&#10;• Summarize the main themes across these data points&#10;• Find common categories and explain the relationships&#10;• Identify any outliers or anomalies in this data"
-                    className="w-full h-48 text-xs resize-none overflow-y-auto border border-input rounded-md p-2"
-                    style={{ minHeight: '192px' }}
-                  />
+                {/* Prompt Input Container */}
+                <div className="flex-1 flex flex-col bg-sidebar-background overflow-hidden">
+                  <div className="p-3 flex flex-col h-full min-h-0">
+                    {/* Textarea Container */}
+                    <div className="flex-1 flex flex-col min-h-0 mb-3">
+                      <Textarea
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="Enter your prompt here. Examples:&#10;• Analyze the sentiment patterns in these texts&#10;• Summarize the main themes across these data points&#10;• Find common categories and explain the relationships&#10;• Identify any outliers or anomalies in this data"
+                        className="flex-1 text-xs resize-none border border-input rounded-md p-3 bg-white focus:ring-2 focus:ring-primary focus:border-transparent min-h-[200px]"
+                      />
+                    </div>
 
-                  <div className="flex gap-2">
-                    <Button 
-                      className="w-full technical-hover transition-all duration-200 h-10 text-xs" 
-                      disabled={!prompt.trim() || selectedPoints.length === 0 || isAnalyzing}
-                      onClick={handleAnalyze}
-                    >
-                      {isAnalyzing ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          <span className="font-mono-technical">ANALYZING...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-4 h-4 mr-2" />
-                          <span className="font-mono-technical">SEND_TO_LLM</span>
-                        </>
+                    {/* Action Button */}
+                    <div className="flex-shrink-0 mb-3">
+                      <Button 
+                        className="w-full technical-hover transition-all duration-200 h-10 text-xs bg-primary hover:bg-primary/90" 
+                        disabled={!prompt.trim() || selectedPoints.length === 0 || isAnalyzing}
+                        onClick={handleAnalyze}
+                      >
+                        {isAnalyzing ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            <span className="font-mono-technical">ANALYZING...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4 mr-2" />
+                            <span className="font-mono-technical">SEND_TO_LLM</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Statistics and Warnings */}
+                    <div className="flex-shrink-0 text-xs text-muted-foreground space-y-2">
+                      <div className="grid grid-cols-2 gap-2 p-2 bg-white/50 rounded border">
+                        <div className="font-mono-technical">
+                          CHARS: <span className="text-technical font-medium">{prompt.length}</span>
+                        </div>
+                        <div className="font-mono-technical">
+                          POINTS: <span className="text-technical font-medium">{selectedPoints.length}</span>
+                        </div>
+                        {selectedPoints.length > 0 && prompt.trim() && (
+                          <>
+                            <div className="font-mono-technical">
+                              TOKENS: <span className="text-technical font-medium">{estimatedTokens}</span>
+                            </div>
+                            <div className="font-mono-technical">
+                              COST: <span className="text-technical font-medium">${estimatedCost.toFixed(4)}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      
+                      {/* Warning Messages */}
+                      {selectedPoints.length === 0 && (
+                        <div className="flex items-start gap-2 text-xs text-amber-700 p-2 bg-amber-50 border border-amber-200 rounded">
+                          <div className="text-amber-500 mt-0.5">⚠️</div>
+                          <div>
+                            <div className="font-medium">No data points selected</div>
+                            <div className="text-amber-600 mt-1">Click on points in the visualization to select them for analysis</div>
+                          </div>
+                        </div>
                       )}
-                    </Button>
-                  </div>
-
-                  <div className="text-xs text-muted-foreground space-y-2 mt-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>CHARS: <span className="text-technical">{prompt.length}</span></div>
-                      <div>POINTS: <span className="text-technical">{selectedPoints.length}</span></div>
-                      {selectedPoints.length > 0 && prompt.trim() && (
-                        <>
-                          <div>TOKENS: <span className="text-technical">{estimatedTokens}</span></div>
-                          <div>COST: <span className="text-technical">${estimatedCost.toFixed(4)}</span></div>
-                        </>
+                      
+                      {!settings.llm.apiKey && (
+                        <div className="flex items-start gap-2 text-xs text-red-700 p-2 bg-red-50 border border-red-200 rounded">
+                          <div className="text-red-500 mt-0.5">🔑</div>
+                          <div>
+                            <div className="font-medium">API key not configured</div>
+                            <div className="text-red-600 mt-1">Configure your API key in settings to enable LLM analysis</div>
+                          </div>
+                        </div>
                       )}
                     </div>
-                    {selectedPoints.length === 0 && (
-                      <div className="text-xs text-orange-600 mt-2 p-2 bg-orange-50 rounded">
-                        ⚠️ No data points selected for analysis
-                      </div>
-                    )}
-                    {!settings.llm.apiKey && (
-                      <div className="text-xs text-red-600 mt-2 p-2 bg-red-50 rounded">
-                        ⚠️ API key not configured
-                      </div>
-                    )}
                   </div>
                 </div>
               </TabsContent>
